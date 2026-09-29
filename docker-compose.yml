@@ -1,0 +1,72 @@
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-careerlens}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-1234}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DB_URL: ${DB_URL:-jdbc:mysql://db:3306/careerlens?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      DB_DRIVER: ${DB_DRIVER:-com.mysql.cj.jdbc.Driver}
+      DB_DDL_AUTO: ${DB_DDL_AUTO:-update}
+      APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
+      APP_SEED_RESET_ENABLED: ${APP_SEED_RESET_ENABLED:-true}
+      APP_RESOURCE_SEED_ENABLED: ${APP_RESOURCE_SEED_ENABLED:-true}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:19000,http://localhost:19001,http://localhost:19002,http://localhost:19006}
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost:*,http://127.0.0.1:*,http://192.168.*:*,http://10.*:*,exp://*,capacitor://*}
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-http://localhost:8080}
+      FRONTEND_PUBLIC_BASE_URL: ${FRONTEND_PUBLIC_BASE_URL:-http://localhost:8081}
+      ADMIN_LOGIN_IDS: ${ADMIN_LOGIN_IDS:-admin,careerlens-admin}
+      JWT_SECRET: ${JWT_SECRET:-change-this-local-docker-secret-before-sharing}
+      KAKAOPAY_ENABLED: ${KAKAOPAY_ENABLED:-false}
+      KAKAOPAY_SECRET_KEY: ${KAKAOPAY_SECRET_KEY:-}
+      KAKAOPAY_CID: ${KAKAOPAY_CID:-TC0ONETIME}
+      KAKAOPAY_API_BASE_URL: ${KAKAOPAY_API_BASE_URL:-https://open-api.kakaopay.com}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_PLANNER_ENABLED: ${AI_PLANNER_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4}
+      OPENAI_RESPONSES_URL: ${OPENAI_RESPONSES_URL:-https://api.openai.com/v1/responses}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      GROQ_RESPONSES_URL: ${GROQ_RESPONSES_URL:-https://api.groq.com/openai/v1/responses}
+      DUFFEL_ENABLED: ${DUFFEL_ENABLED:-false}
+      DUFFEL_ACCESS_TOKEN: ${DUFFEL_ACCESS_TOKEN:-}
+      DUFFEL_BASE_URL: ${DUFFEL_BASE_URL:-https://api.duffel.com}
+      DUFFEL_VERSION: ${DUFFEL_VERSION:-v2}
+      DUFFEL_SUPPLIER_TIMEOUT_MILLIS: ${DUFFEL_SUPPLIER_TIMEOUT_MILLIS:-10000}
+      AMADEUS_ENABLED: ${AMADEUS_ENABLED:-false}
+      AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
+      AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
+      AMADEUS_BASE_URL: ${AMADEUS_BASE_URL:-https://test.api.amadeus.com}
+      AMADEUS_CURRENCY_CODE: ${AMADEUS_CURRENCY_CODE:-KRW}
+      GREENHOUSE_ENABLED: ${GREENHOUSE_ENABLED:-true}
+      GREENHOUSE_SYNC_ENABLED: ${GREENHOUSE_SYNC_ENABLED:-false}
+      GREENHOUSE_SYNC_BOARD_TOKENS: ${GREENHOUSE_SYNC_BOARD_TOKENS:-airbnb,stripe,reddit,databricks,figma,greenhouse,anthropic,doordashusa,asana,discord,duolingo,gitlab,mixpanel,webflow}
+    ports:
+      - "8088:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql-data:

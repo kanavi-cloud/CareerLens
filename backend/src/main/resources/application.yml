@@ -1,0 +1,89 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: careerlens-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/careerlens?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:1234}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+careerlens:
+  seed:
+    path: ../seed-data/recommendation-seed.json
+    processed-path: ../seed-data/processed
+
+app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    reset-enabled: ${APP_SEED_RESET_ENABLED:false}
+  resource-seed:
+    enabled: ${APP_RESOURCE_SEED_ENABLED:false}
+  auth:
+    admin-login-ids: ${ADMIN_LOGIN_IDS:admin,careerlens-admin}
+    jwt:
+      secret: ${JWT_SECRET:careerlens-local-demo-secret-change-before-deploy-2026}
+      issuer: ${JWT_ISSUER:careerlens}
+      expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  frontend-public-base-url: ${FRONTEND_PUBLIC_BASE_URL:http://localhost:3000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:8081,http://127.0.0.1:8081,http://localhost:19000,http://localhost:19001,http://localhost:19002,http://localhost:19006}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*:*,http://10.*:*,exp://*,capacitor://*}
+  ai:
+    provider: ${AI_PROVIDER:openai}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-5.4}
+      responses-url: ${OPENAI_RESPONSES_URL:https://api.openai.com/v1/responses}
+      enabled: ${AI_PLANNER_ENABLED:false}
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}
+      responses-url: ${GROQ_RESPONSES_URL:https://api.groq.com/openai/v1/responses}
+  kakaopay:
+    enabled: ${KAKAOPAY_ENABLED:false}
+    secret-key: ${KAKAOPAY_SECRET_KEY:}
+    cid: ${KAKAOPAY_CID:TC0ONETIME}
+    api-base-url: ${KAKAOPAY_API_BASE_URL:https://open-api.kakaopay.com}
+  travel:
+    provider: ${TRAVEL_PROVIDER:duffel}
+    duffel:
+      enabled: ${DUFFEL_ENABLED:false}
+      access-token: ${DUFFEL_ACCESS_TOKEN:}
+      base-url: ${DUFFEL_BASE_URL:https://api.duffel.com}
+      version: ${DUFFEL_VERSION:v2}
+      supplier-timeout-millis: ${DUFFEL_SUPPLIER_TIMEOUT_MILLIS:10000}
+    amadeus:
+      enabled: ${AMADEUS_ENABLED:false}
+      client-id: ${AMADEUS_CLIENT_ID:}
+      client-secret: ${AMADEUS_CLIENT_SECRET:}
+      base-url: ${AMADEUS_BASE_URL:https://test.api.amadeus.com}
+      currency-code: ${AMADEUS_CURRENCY_CODE:KRW}
+  external-jobs:
+    greenhouse:
+      enabled: ${GREENHOUSE_ENABLED:true}
+      base-url: ${GREENHOUSE_BASE_URL:https://boards-api.greenhouse.io}
+      timeout-seconds: ${GREENHOUSE_TIMEOUT_SECONDS:12}
+      sync:
+        enabled: ${GREENHOUSE_SYNC_ENABLED:false}
+        board-tokens: ${GREENHOUSE_SYNC_BOARD_TOKENS:airbnb,stripe,reddit,databricks,figma,greenhouse,anthropic,doordashusa,asana,discord,duolingo,gitlab,mixpanel,webflow}
+        default-country: ${GREENHOUSE_SYNC_DEFAULT_COUNTRY:ALL}
+        default-job-family: ${GREENHOUSE_SYNC_DEFAULT_JOB_FAMILY:ALL}
+        limit-per-board: ${GREENHOUSE_SYNC_LIMIT_PER_BOARD:50}
+        create-pattern-profile: ${GREENHOUSE_SYNC_CREATE_PATTERN_PROFILE:true}
+        default-deadline-offset-days: ${GREENHOUSE_SYNC_DEFAULT_DEADLINE_OFFSET_DAYS:0}
+        fixed-delay-minutes: ${GREENHOUSE_SYNC_FIXED_DELAY_MINUTES:360}
+        fixed-delay-millis: ${GREENHOUSE_SYNC_FIXED_DELAY_MILLIS:21600000}
+        initial-delay-millis: ${GREENHOUSE_SYNC_INITIAL_DELAY_MILLIS:60000}

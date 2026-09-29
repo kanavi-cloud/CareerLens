@@ -1,0 +1,45 @@
+package com.careerlens.backend.dto;
+
+import java.util.List;
+
+public record UserProfileSummaryDto(
+        Long userId,
+        String displayName,
+        String targetCountry,
+        String targetCity,
+        String targetJobFamily,
+        String desiredJobTitle,
+        String currentCountry,
+        String nationality,
+        Integer experienceYears,
+        Integer relatedExperienceYears,
+        String languageLevel,
+        String englishLevel,
+        String japaneseLevel,
+        String education,
+        String major,
+        String graduationStatus,
+        String preferredWorkType,
+        String expectedSalaryRange,
+        String availableStartDate,
+        Boolean visaSponsorshipNeeded,
+        List<String> techStack,
+        List<String> certifications,
+        Boolean githubPresent,
+        Boolean portfolioPresent,
+        String githubUrl,
+        String portfolioUrl,
+        Boolean prioritizeSalary,
+        Boolean prioritizeAcceptanceProbability,
+        Boolean prioritizeWorkLifeBalance,
+        Boolean prioritizeCompanyValue,
+        Boolean prioritizeJobFit,
+        String projectExperienceSummary,
+        String domainExperience,
+        String cloudExperience,
+        String databaseExperience,
+        String deploymentExperience,
+        String languageTestScores,
+        List<String> preferences
+) {
+}
