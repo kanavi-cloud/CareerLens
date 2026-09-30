@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type PlannerTask = {
   task_id: number;
@@ -37,9 +37,8 @@ export type PlannerRoadmap = {
   tasks: PlannerTask[];
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function createPlannerRoadmap(diagnosisId: number): Promise<PlannerRoadmap> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/planner/roadmaps/from-diagnosis/${diagnosisId}`, {
     method: "POST",
     headers: authHeaders(),
@@ -54,6 +53,7 @@ export async function createPlannerRoadmap(diagnosisId: number): Promise<Planner
 }
 
 export async function fetchPlannerRoadmap(roadmapId: number): Promise<PlannerRoadmap> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/planner/roadmaps/${roadmapId}`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -67,6 +67,7 @@ export async function fetchPlannerRoadmap(roadmapId: number): Promise<PlannerRoa
 }
 
 export async function fetchUserRoadmaps(userId: number): Promise<PlannerRoadmap[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/planner/users/${userId}/roadmaps`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -80,6 +81,7 @@ export async function fetchUserRoadmaps(userId: number): Promise<PlannerRoadmap[
 }
 
 export async function deletePlannerRoadmap(roadmapId: number): Promise<void> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/planner/roadmaps/${roadmapId}`, {
     method: "DELETE",
     headers: authHeaders(),
@@ -92,6 +94,7 @@ export async function deletePlannerRoadmap(roadmapId: number): Promise<void> {
 }
 
 export async function updatePlannerTaskStatus(taskId: number, status: PlannerTaskStatus): Promise<PlannerRoadmap> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/planner/tasks/${taskId}/status`, {
     method: "PATCH",
     headers: {

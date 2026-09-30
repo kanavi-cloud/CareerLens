@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from "@/lib/auth";
+
 export type DeadlineStatus = "ROLLING" | "CLOSED" | "URGENT" | "CLOSING_SOON" | "OPEN";
 
 export type JobPosting = {
@@ -25,9 +27,8 @@ export type JobPosting = {
   evaluation_rationale: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function fetchJobs(): Promise<JobPosting[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await fetch(`${baseUrl}/api/jobs`, {
     cache: "no-store"
   });

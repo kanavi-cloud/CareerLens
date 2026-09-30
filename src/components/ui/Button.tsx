@@ -18,6 +18,7 @@ export const Button = ({
   loading = false,
   className = "",
 }: ButtonProps) => {
+  const lightText = variant === "primary" || variant === "secondary";
   const getVariantStyle = () => {
     switch (variant) {
       case "primary":
@@ -37,14 +38,16 @@ export const Button = ({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       className={`flex-row min-h-10 items-center justify-center rounded-lg px-4 py-2 transition ${
         disabled ? "opacity-60" : "active:opacity-80"
       } ${getVariantStyle()} ${className}`}
     >
       {loading ? (
-        <ActivityIndicator color="#ffffff" />
+        <ActivityIndicator color={lightText ? "#ffffff" : "#111827"} />
       ) : typeof children === "string" ? (
-        <Text className="text-sm font-semibold">{children}</Text>
+        <Text className="text-center text-sm font-semibold" style={{ color: lightText ? "#ffffff" : "#111827" }}>{children}</Text>
       ) : (
         children
       )}

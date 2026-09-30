@@ -66,16 +66,14 @@ export function SiteHeader() {
 
         <View className="flex-row items-center gap-2">
           {user ? (
-            <Link href="/mypage" asChild>
-              <Pressable className="max-w-[96px] rounded border border-white/20 px-2.5 py-1.5">
-                <Text
-                  className="text-xs font-semibold text-slate-100"
-                  numberOfLines={1}
-                >
-                  {user.display_name}
-                </Text>
-              </Pressable>
-            </Link>
+            <Pressable
+              onPress={handleLogout}
+              accessibilityRole="button"
+              accessibilityLabel="로그아웃"
+              className="min-h-[36px] items-center justify-center rounded border border-white/30 px-3 py-1.5"
+            >
+              <Text className="text-xs font-bold text-white">로그아웃</Text>
+            </Pressable>
           ) : (
             <Link href="/login" asChild>
               <Pressable className="min-h-[36px] items-center justify-center border border-white/25 bg-white px-3 py-1.5">
