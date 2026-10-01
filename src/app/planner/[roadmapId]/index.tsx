@@ -29,14 +29,14 @@ import {
   type PlannerTask,
   type PlannerTaskStatus,
 } from "@/lib/planner";
-import { useParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 
 type WeekFilter = number | "ALL";
 
 export default function PlannerRoadmapPage() {
-  const params = useParams<{ roadmapId: string }>();
+  const params = useLocalSearchParams<{ roadmapId: string }>();
   const router = useRouter();
   const auth = useRequiredAuth();
   const roadmapId = Number(params.roadmapId);

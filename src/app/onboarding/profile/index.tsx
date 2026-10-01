@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, TextInput as NativeTextInput } from 'react-native';
 "use client";
 
 import { useRouter } from "expo-router";
@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { AuthCheckingScreen, AuthRequiredScreen, useRequiredAuth } from "@/components/auth/RequireAuth";
 import { SiteHeader } from "@/components/site-header";
-import { Badge, Button, Card, MetricCard, PageShell, SelectInput, TextInput } from "@/components/ui";
+import { Badge, Button, Card, MetricCard, PageShell } from "@/components/ui";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import { storeUser, type AuthUser } from "@/lib/auth";
 import { countryLabel, languageLevelLabel, preferenceLabel, startDateLabel, workTypeLabel } from "@/lib/display-labels";
@@ -61,6 +61,7 @@ export default function ProfileOnboardingPage() {
   const [profile, setProfile] = useState<UserProfileRequest>(demoProfile);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [profileLoadState, setProfileLoadState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +73,8 @@ export default function ProfileOnboardingPage() {
     }
 
     const storedUser = auth.user;
+    setProfileLoadState("loading");
+    setErrorMessage(null);
     setUser(storedUser);
     const baseProfile = {
       ...demoProfile,
@@ -92,8 +95,17 @@ export default function ProfileOnboardingPage() {
           certifications: cleanTags(storedProfile.certifications),
           preferences: cleanTags(storedProfile.preferences)
         });
+        setProfileLoadState("ready");
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        if (cancelled) return;
+        if (error instanceof Error && error.message.toLowerCase().includes("user profile not found")) {
+          setProfileLoadState("ready");
+          return;
+        }
+        setProfileLoadState("error");
+        setErrorMessage("프로필을 불러오지 못했습니다. 연결을 확인한 뒤 화면을 다시 열어주세요. 기존 프로필을 보호하기 위해 저장을 중지했습니다.");
+      });
 
     return () => {
       cancelled = true;
@@ -101,7 +113,7 @@ export default function ProfileOnboardingPage() {
   }, [auth.isChecking, auth.user]);
 
   async function submit() {
-    if (!user) return;
+    if (!user || profileLoadState !== "ready" || isLoading) return;
     setIsLoading(true);
     setErrorMessage(null);
     try {
@@ -161,7 +173,7 @@ export default function ProfileOnboardingPage() {
                 맞춤 공고 추천과 적합도 진단에 사용할 정보를 관리합니다.
               </Text>
             </View>
-            <Button  className="w-fit shadow-[0_10px_24px_rgba(10,31,36,0.14)] hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(10,31,36,0.18)]" onPress={submit} disabled={isLoading}>
+            <Button  className="w-fit shadow-[0_10px_24px_rgba(10,31,36,0.14)] hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(10,31,36,0.18)]" onPress={submit} disabled={isLoading || profileLoadState !== "ready"}>
               {isLoading ? "저장 중" : "저장하고 추천 보기"}
             </Button>
           </View>
@@ -206,7 +218,7 @@ export default function ProfileOnboardingPage() {
           <View className="space-y-5">
             {errorMessage && (
               <View role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                {errorMessage}
+                <Text className="text-sm text-red-700">{errorMessage}</Text>
               </View>
             )}
 
@@ -240,7 +252,7 @@ export default function ProfileOnboardingPage() {
             </Section>
 
             <Section step="04" title="지원 조건과 증빙" description="연봉, 비자, GitHub, 포트폴리오 정보를 입력합니다.">
-              <View className="flex-row gap-4 md:col-span-2 lg:flex-cols-2">
+              <View className="flex-col gap-4">
                 <View className="space-y-4 rounded-2xl border border-line bg-panel/50 p-4">
                   <View>
                     <Text className="text-sm font-black text-night">지원 조건</Text>
@@ -269,7 +281,7 @@ export default function ProfileOnboardingPage() {
             <View className="sticky bottom-0 z-10 -mx-5 border-t border-line bg-[#f6f8f4]/90 px-5 py-4 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
               <View className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-panel sm:flex-row sm:items-center sm:justify-between">
                 <Text className="text-sm font-semibold text-slate-600">저장 후 맞춤추천 화면으로 이동합니다.</Text>
-                <Button  className="hover:-translate-y-0.5 hover:shadow-lg" onPress={submit} disabled={isLoading}>{isLoading ? "저장 중" : "프로필 저장 후 추천 보기"}</Button>
+                <Button  className="hover:-translate-y-0.5 hover:shadow-lg" onPress={submit} disabled={isLoading || profileLoadState !== "ready"}>{isLoading ? "저장 중" : "프로필 저장 후 추천 보기"}</Button>
               </View>
             </View>
           </View>
@@ -289,7 +301,7 @@ function Section({ step, title, description, children }: { step: string; title: 
           {description && <Text className="mt-1 text-sm leading-6 text-slate-600">{description}</Text>}
         </View>
       </View>
-      <View className="flex-row gap-4 md:flex-cols-2">{children}</View>
+      <View className="flex-col gap-4">{children}</View>
     </Card>
   );
 }
@@ -310,9 +322,16 @@ function SelectField({
   onChange: (value: string) => void;
 }) {
   return (
-    <ProfileSelect label={label} helper={helper} value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map((option) => <option key={option} value={option}>{optionLabel ? optionLabel(option) : option}</option>)}
-    </ProfileSelect>
+    <View className="gap-2">
+      <FieldLabel label={label} helper={helper} />
+      <View className="flex-row flex-wrap gap-2">
+        {options.map((option) => (
+          <Pressable key={option} accessibilityRole="radio" accessibilityState={{ checked: option === value }} onPress={() => onChange(option)} className={`rounded-lg border px-3 py-3 ${option === value ? "border-teal-700 bg-teal-50" : "border-slate-200 bg-white"}`}>
+            <Text className={option === value ? "text-teal-800 font-bold" : "text-slate-700"}>{optionLabel ? optionLabel(option) : option}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -322,28 +341,21 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
   );
 }
 
-function ProfileTextInput({ label, helper, className = "", ...props }: Parameters<typeof TextInput>[0]) {
+function ProfileTextInput({ label, helper, className = "", value, onChange, type, min, ...props }: {
+  label: string; helper?: string; className?: string; value: string | number;
+  onChange: (event: { target: { value: string } }) => void;
+  type?: string; min?: number; placeholder?: string;
+}) {
   return (
     <View className={` ${className}`}>
       <FieldLabel label={label} helper={helper} />
-      <input
+      <NativeTextInput
+        value={String(value)}
+        onChangeText={(text) => onChange({ target: { value: type === "number" ? String(Math.max(min ?? 0, Number(text) || 0)) : text } })}
+        keyboardType={type === "number" ? "numeric" : "default"}
         className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.03)] outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:bg-slate-100"
         {...props}
       />
-    </View>
-  );
-}
-
-function ProfileSelect({ label, helper, children, className = "", ...props }: Parameters<typeof SelectInput>[0]) {
-  return (
-    <View className={` ${className}`}>
-      <FieldLabel label={label} helper={helper} />
-      <select
-        className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-ink shadow-[0_1px_0_rgba(15,23,42,0.03)] outline-none transition duration-200 hover:border-slate-300 focus:border-brand focus:ring-4 focus:ring-brand/10 disabled:bg-slate-100"
-        {...props}
-      >
-        {children}
-      </select>
     </View>
   );
 }
@@ -396,6 +408,7 @@ function TagInput({
   onChange: (tags: string[]) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   function addTag(value: string) {
     const next = value.trim();
@@ -417,18 +430,13 @@ function TagInput({
         <View className="flex-row flex-wrap gap-2">
           {tags.map((tag) => (
             <Pressable key={tag}  onPress={() => onChange(tags.filter((item) => item !== tag))} className="rounded-xl bg-[#e8f2f1] px-3 py-1 text-sm font-semibold text-brand transition hover:bg-[#dcebea]">
-              {tagLabel ? tagLabel(tag) : tag} x
+              <Text className="text-sm text-teal-800">{tagLabel ? tagLabel(tag) : tag} x</Text>
             </Pressable>
           ))}
-          <input
+          <NativeTextInput
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === ",") {
-                event.preventDefault();
-                addTag(draft);
-              }
-            }}
+            onChangeText={setDraft}
+            onSubmitEditing={() => addTag(draft)}
             onBlur={() => addTag(draft)}
             placeholder="입력 후 Enter"
             className="h-8 min-w-36 flex-1 border-0 bg-transparent px-1 text-sm outline-none"
@@ -436,21 +444,21 @@ function TagInput({
         </View>
       </View>
       {suggestions.length > 0 && (
-        <details className="mt-2 rounded-2xl border border-line bg-panel/70 transition duration-200 open:border-brand/30 open:bg-[#f4faf9]">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-bold text-slate-700 transition duration-200 hover:text-brand [&::-webkit-details-marker]:hidden">
+        <View className="mt-2 rounded-lg border border-line bg-panel/70">
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} className="flex-row items-center justify-between gap-3 px-3 py-3">
             <Text>추천 항목</Text>
             <Text className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-black text-brand">
               {suggestions.length}개 보기
             </Text>
-          </summary>
-          <View className="flex-row flex-wrap gap-2 border-t border-line px-3 py-3">
+          </Pressable>
+          {expanded && <View className="flex-row flex-wrap gap-2 border-t border-line px-3 py-3">
             {suggestions.map((suggestion) => (
               <Pressable key={suggestion}  onPress={() => addTag(suggestion)} className="rounded-xl border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition duration-200 hover:border-brand hover:text-brand">
-                + {tagLabel ? tagLabel(suggestion) : suggestion}
+                <Text className="text-xs text-slate-700">+ {tagLabel ? tagLabel(suggestion) : suggestion}</Text>
               </Pressable>
             ))}
-          </View>
-        </details>
+          </View>}
+        </View>
       )}
     </View>
   );

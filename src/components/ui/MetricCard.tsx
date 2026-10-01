@@ -5,7 +5,11 @@ export function MetricCard({ label, value, helper }: { label: string; value: Rea
   return (
     <View className="rounded-xl border border-line bg-panel p-3">
       <Text className="text-xs font-semibold text-slate-500">{label}</Text>
-      <View className="mt-1 text-lg font-semibold text-night">{value}</View>
+      <View className="mt-1">
+        {typeof value === "string" || typeof value === "number" ? (
+          <Text className="text-lg font-semibold text-night">{value}</Text>
+        ) : value}
+      </View>
       {helper && <Text className="mt-1 text-xs text-slate-500">{helper}</Text>}
     </View>
   );

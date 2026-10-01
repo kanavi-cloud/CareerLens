@@ -1,13 +1,15 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
-import { useRouter } from "expo-router";
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AuthCheckingScreen, AuthRequiredScreen, useRequiredAuth } from "@/components/auth/RequireAuth";
 import { SiteHeader } from "@/components/site-header";
-import { Badge, Button, Card, EmptyState, LinkButton, MetricCard, PageShell } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, LinkButton, PageShell, ScoreBar } from "@/components/ui";
 import type { AuthUser } from "@/lib/auth";
+import { countryLabel, languageLevelLabel } from "@/lib/display-labels";
+import { isMembershipLimitMessage } from "@/lib/membership";
+import { createPlannerRoadmap } from "@/lib/planner";
 import {
   demoProfile,
   diagnoseStoredProfile,
@@ -16,14 +18,8 @@ import {
   type RecommendationResponse,
   type UserProfileRequest
 } from "@/lib/recommendation";
-import { createPlannerRoadmap } from "@/lib/planner";
-import { isMembershipLimitMessage } from "@/lib/membership";
-import { countryLabel, languageLevelLabel } from "@/lib/display-labels";
 
 const MAX_VISIBLE_RECOMMENDATIONS = 5;
-const HORIZONTAL_BAR_COLOR = "#2f73d8";
-const DISTRIBUTION_BAR_COLOR = "#9bb7ee";
-const SCORE_RING_COLOR = "#168f93";
 
 export default function RecommendationPage() {
   const router = useRouter();
@@ -36,6 +32,8 @@ export default function RecommendationPage() {
   const [creatingPlannerId, setCreatingPlannerId] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [profileMissing, setProfileMissing] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileReady, setProfileReady] = useState(false);
 
   const displayedRecommendations = useMemo(
     () => result?.recommendations.slice(0, MAX_VISIBLE_RECOMMENDATIONS) ?? [],
@@ -47,30 +45,43 @@ export default function RecommendationPage() {
     return displayedRecommendations.find((item) => item.job_id === selectedJobId) ?? displayedRecommendations[0];
   }, [displayedRecommendations, selectedJobId]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (auth.isChecking || !auth.user) return;
 
     const activeUser = auth.user;
+    let active = true;
+    setProfileLoading(true);
+    setProfileReady(false);
+    setProfileMissing(false);
+    setErrorMessage(null);
+    setResult(null);
     setUser(activeUser);
 
     fetchUserProfile(activeUser.user_id)
       .then((storedProfile) => {
+        if (!active) return;
+        setProfileReady(true);
         setProfileMissing(false);
         setProfile({
-          ...demoProfile,
           ...storedProfile,
-          display_name: storedProfile.display_name,
+          tech_stack: storedProfile.tech_stack ?? [],
+          certifications: storedProfile.certifications ?? [],
+          preferences: storedProfile.preferences ?? [],
+          display_name: storedProfile.display_name || activeUser.display_name,
           email: activeUser.email
         });
       })
       .catch((error) => {
+        if (!active) return;
         if (isProfileMissingError(error)) {
           setProfileMissing(true);
         } else {
           setErrorMessage(error instanceof Error ? error.message : "프로필 정보를 불러오지 못했습니다.");
         }
-      });
-  }, [auth.isChecking, auth.user]);
+      })
+      .finally(() => { if (active) setProfileLoading(false); });
+    return () => { active = false; };
+  }, [auth.isChecking, auth.user]));
 
   if (auth.isChecking) {
     return <AuthCheckingScreen title="적합도 진단 권한을 확인하는 중입니다." />;
@@ -83,9 +94,10 @@ export default function RecommendationPage() {
   async function runDiagnosis() {
     const activeUser = user ?? auth.user;
     if (!activeUser) return;
+    if (isLoading || profileLoading || !profileReady) return;
 
     if (profileMissing) {
-      setErrorMessage(null);
+      setErrorMessage("프로필을 먼저 등록해야 적합도 진단을 실행할 수 있습니다.");
       return;
     }
 
@@ -94,8 +106,9 @@ export default function RecommendationPage() {
 
     try {
       const response = await diagnoseStoredProfile(activeUser.user_id);
+      const recommendations = response.recommendations.slice(0, MAX_VISIBLE_RECOMMENDATIONS);
       setResult(response);
-      setSelectedJobId(response.recommendations[0]?.job_id ?? null);
+      setSelectedJobId(recommendations[0]?.job_id ?? null);
     } catch (error) {
       if (isProfileMissingError(error)) {
         setProfileMissing(true);
@@ -109,6 +122,7 @@ export default function RecommendationPage() {
   }
 
   async function createPlanner(diagnosisId: number) {
+    if (creatingPlannerId !== null) return;
     setCreatingPlannerId(diagnosisId);
     setErrorMessage(null);
 
@@ -125,230 +139,202 @@ export default function RecommendationPage() {
   return (
     <PageShell>
       <SiteHeader />
-      <TopPageIntro />
+      <View className="w-full flex-col gap-4 px-4 py-4">
+        <HeaderSection />
 
-      <View>
-        <View className="mx-auto w-full max-w-[1680px]">
-          <View className="flex w-full items-start gap-4 xl:flex-cols-[340px_minmax(0,1fr)_340px]">
-            <View>
-              <ProfileCard profile={profile} user={user} />
-            </View>
-
-            <View className="min-w-0 xl:col-span-2">
-              <SummaryBanner
-                result={result}
-                recommendations={displayedRecommendations}
-                isLoading={isLoading}
-                errorMessage={errorMessage}
-                profileMissing={profileMissing}
-                onRun={runDiagnosis}
-              />
-            </View>
-
-            <View>
-              <ResultsHeader count={displayedRecommendations.length} hasResult={!!result} />
-
-              {isLoading && <LoadingState />}
-
-              {!isLoading && !result && !profileMissing && (
-                <EmptyState
-                  title="아직 진단 결과가 없습니다."
-                  description="적합도 진단을 실행하면 상위 공고 5건과 세부 점수를 비교하기 쉬운 형태로 정리해드립니다."
-                  action={
-                    <Button  onPress={runDiagnosis}>
-                      적합도 진단 실행
-                    </Button>
-                  }
-                />
-              )}
-
-              {!isLoading && result && (
-                <>
-                  {displayedRecommendations.map((recommendation, index) => (
-                    <RecommendationCard
-                      key={`${recommendation.diagnosis_id}-${recommendation.job_id}`}
-                      recommendation={recommendation}
-                      rank={index + 1}
-                      selected={selectedRecommendation?.job_id === recommendation.job_id}
-                      onSelect={() => setSelectedJobId(recommendation.job_id)}
-                      onCreatePlanner={() => createPlanner(recommendation.diagnosis_id)}
-                      isCreatingPlanner={creatingPlannerId === recommendation.diagnosis_id}
-                    />
-                  ))}
-                  {displayedRecommendations.length === 0 && <NoCandidateState />}
-                </>
-              )}
-            </View>
-
-            <ComparisonPanel recommendation={selectedRecommendation} recommendations={displayedRecommendations} />
+        {profileReady ? (
+          <ProfileSummary profile={profile} user={user} profileMissing={profileMissing} />
+        ) : profileLoading ? (
+          <View className="flex-row items-center gap-3 py-4">
+            <ActivityIndicator color="#0f766e" />
+            <Text className="text-sm text-slate-700">프로필을 불러오는 중입니다.</Text>
           </View>
-        </View>
+        ) : null}
+
+        <ActionPanel
+          result={result}
+          recommendations={displayedRecommendations}
+          isLoading={isLoading}
+          profileMissing={profileMissing}
+          profileUnavailable={profileLoading || !profileReady}
+          errorMessage={errorMessage}
+          onRun={runDiagnosis}
+        />
+
+        {isLoading && <LoadingState />}
+
+        {!isLoading && !result && profileReady && (
+          <EmptyState
+            title="아직 진단 결과가 없습니다."
+            description="저장된 프로필을 기준으로 채용공고 적합도와 보완 포인트를 분석합니다."
+            action={<Button onPress={runDiagnosis}>적합도 진단 실행</Button>}
+          />
+        )}
+
+        {!isLoading && result && displayedRecommendations.length > 0 && (
+          <View className="flex-col gap-3">
+            <SectionTitle title="추천 공고 Top 5" subtitle="총점이 높은 순서로 정리했습니다." />
+            {displayedRecommendations.map((recommendation, index) => (
+              <RecommendationCard
+                key={`${recommendation.diagnosis_id}-${recommendation.job_id}`}
+                recommendation={recommendation}
+                rank={index + 1}
+                selected={selectedRecommendation?.job_id === recommendation.job_id}
+                onSelect={() => setSelectedJobId(recommendation.job_id)}
+                onCreatePlanner={() => createPlanner(recommendation.diagnosis_id)}
+                isCreatingPlanner={creatingPlannerId === recommendation.diagnosis_id}
+              />
+            ))}
+          </View>
+        )}
+
+        {!isLoading && result && displayedRecommendations.length === 0 && (
+          <EmptyState
+            title="조건에 맞는 공고가 없습니다."
+            description="프로필의 희망 국가, 직무, 언어 수준, 경력 조건을 조정한 뒤 다시 진단해보세요."
+          />
+        )}
+
+        {!isLoading && <SelectedAnalysis recommendation={selectedRecommendation} />}
       </View>
     </PageShell>
   );
 }
 
-function ResultsHeader({ count, hasResult }: { count: number; hasResult: boolean }) {
+function HeaderSection() {
   return (
-    <View className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.04)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-      <View>
-        <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Ranking Overview</Text>
-        <Text className="mt-1 text-xl font-semibold tracking-tight text-slate-950">상위 5개 공고 비교</Text>
-      </View>
-      <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        <Text className="font-medium text-slate-700">정렬 기준</Text>
-        <Text className="rounded-full bg-white px-3 py-1 font-semibold text-slate-900 shadow-sm">적합도 높은 순</Text>
-        <Text className="text-slate-400">|</Text>
-        <Text>{hasResult ? `${count}개 표시` : "진단 후 표시"}</Text>
-      </View>
+    <View className="flex-col gap-2">
+      <Text className="text-xs font-black tracking-[0.16em] text-brand">SUITABILITY DIAGNOSIS</Text>
+      <Text className="text-2xl font-black leading-tight text-night">적합도 진단</Text>
+      <Text className="text-sm leading-6 text-slate-600">
+        저장된 프로필과 해외 채용공고를 비교해 지원 우선순위와 보완할 항목을 보여줍니다.
+      </Text>
     </View>
   );
 }
 
-function TopPageIntro() {
-  return (
-    <View className="border-b border-slate-200 bg-white px-2 py-6 sm:px-3 lg:px-4">
-      <View className="mx-auto w-full max-w-[1680px] px-5">
-        <Text className="flex-row items-center border border-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-950">
-          Recommendation Dashboard
-        </Text>
-        <Text className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">적합도 진단 서비스</Text>
-        <Text className="mt-2 text-sm leading-6 text-slate-600">
-          저장된 프로필을 기준으로 추천 공고의 적합도와 보완 포인트를 한 번에 비교할 수 있습니다.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function ProfileCard({ profile, user }: { profile: UserProfileRequest; user: AuthUser | null }) {
+function ProfileSummary({
+  profile,
+  user,
+  profileMissing
+}: {
+  profile: UserProfileRequest;
+  user: AuthUser | null;
+  profileMissing: boolean;
+}) {
   const priorities = priorityLabels(profile);
 
   return (
-    <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_46px_rgba(15,23,42,0.07)]">
-      <View className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-5">
-        <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Profile</Text>
-        <Text className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-          {profile.display_name || user?.display_name || "사용자 프로필"}
-        </Text>
-        <Text className="mt-1 text-sm text-slate-500">{user?.email || profile.email}</Text>
+    <Card className="flex-col gap-4 shadow-sm">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <Text className="text-xs font-black tracking-[0.14em] text-brand">내 프로필</Text>
+          <Text className="mt-2 text-lg font-black text-night">{profile.display_name || user?.display_name || "사용자"}</Text>
+          <Text className="mt-1 text-xs text-slate-500">{user?.email || profile.email}</Text>
+        </View>
+        <Badge tone={profileMissing ? "warning" : "success"}>{profileMissing ? "등록 필요" : "사용 가능"}</Badge>
       </View>
 
-      <View className="space-y-4 p-5">
-        <dl className="flex-row gap-2 gap-2.5">
-          <MetricCard label="희망 국가" value={countryLabel(profile.target_country)} />
-          <MetricCard label="직무 분야" value={profile.target_job_family} />
-          <MetricCard label="총 경력" value={`${profile.experience_years ?? 0}년`} />
-          <MetricCard label="언어" value={languageLevelLabel(profile.language_level)} />
-        </dl>
-
-        <View>
-          <Text className="text-sm font-semibold text-slate-900">우선순위</Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            {priorities.map((priority) => (
-              <Badge key={priority} tone="success">
-                {priority}
-              </Badge>
-            ))}
-            {priorities.length === 0 && <Badge tone="muted">기본 기준 적용</Badge>}
-          </View>
-        </View>
-
-        <View>
-          <Text className="text-sm font-semibold text-slate-900">기술 스택</Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            {profile.tech_stack.slice(0, 8).map((tech) => (
-              <Badge key={tech} tone="muted">
-                {tech}
-              </Badge>
-            ))}
-            {profile.tech_stack.length === 0 && <Badge tone="muted">등록된 기술 없음</Badge>}
-          </View>
-        </View>
-
-        <LinkButton href="/mypage" variant="secondary" className="w-full rounded-xl border-slate-200">
-          프로필 수정
-        </LinkButton>
+      <View className="flex-row flex-wrap gap-2">
+        <InfoPill label="희망 국가" value={countryLabel(profile.target_country)} />
+        <InfoPill label="직무" value={profile.target_job_family || "미입력"} />
+        <InfoPill label="경력" value={`${profile.experience_years ?? 0}년`} />
+        <InfoPill label="언어" value={languageLevelLabel(profile.language_level)} />
       </View>
+
+      <View className="flex-col gap-2">
+        <Text className="text-sm font-black text-night">우선순위</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {priorities.map((priority) => (
+            <Badge key={priority} tone="brand">{priority}</Badge>
+          ))}
+          {priorities.length === 0 && <Badge tone="muted">기본 기준</Badge>}
+        </View>
+      </View>
+
+      <View className="flex-col gap-2">
+        <Text className="text-sm font-black text-night">기술 스택</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {profile.tech_stack.slice(0, 8).map((tech) => (
+            <Badge key={tech} tone="muted">{tech}</Badge>
+          ))}
+          {profile.tech_stack.length === 0 && <Badge tone="muted">등록된 기술 없음</Badge>}
+        </View>
+      </View>
+
+      <LinkButton href="/onboarding/profile" variant="secondary">프로필 수정</LinkButton>
     </Card>
   );
 }
 
-function SummaryBanner({
+function ActionPanel({
   result,
   recommendations,
   isLoading,
-  errorMessage,
   profileMissing,
+  profileUnavailable,
+  errorMessage,
   onRun
 }: {
   result: RecommendationResponse | null;
   recommendations: JobRecommendation[];
   isLoading: boolean;
-  errorMessage: string | null;
   profileMissing: boolean;
+  profileUnavailable: boolean;
+  errorMessage: string | null;
   onRun: () => void;
 }) {
-  if (profileMissing) {
-    return (
-      <EmptyState
-        title="해외취업 프로필 등록이 필요합니다."
-        description="마이페이지에서 희망 국가, 직무, 경력, 언어와 기술 스택을 입력하면 적합도 진단을 시작할 수 있습니다."
-        action={<LinkButton href="/mypage">프로필 등록하러 가기</LinkButton>}
-      />
-    );
-  }
-
-  if (errorMessage) {
-    return (
-      <View role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
-        <View className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Text>{errorMessage}</Text>
-          {isMembershipLimitMessage(errorMessage) && <LinkButton href="/membership">Pro 멤버십 보기</LinkButton>}
-        </View>
-      </View>
-    );
-  }
-
   const topScore = recommendations[0]?.score_breakdown.total_score ?? 0;
   const averageTotalScore = averageScore(recommendations.map((item) => item.score_breakdown.total_score));
 
   return (
-    <Card className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_18px_48px_rgba(20,184,166,0.08)]">
-      <View className="border-l-4 border-l-emerald-100 bg-[linear-gradient(90deg,#eefcf8_0%,#ffffff_50%,#f8fbff_100%)] px-4 py-4 sm:px-5">
-        <View className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <View className="max-w-3xl">
-            <Text className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-700">Diagnosis Result</Text>
-            <Text className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-              {isLoading ? "적합도 진단을 분석하고 있어요" : "적합도 진단 결과"}
-            </Text>
-            <Text className="mt-2 max-w-2xl text-xs leading-5 text-slate-600">
-              {result
-                ? `분석된 공고 ${result.returned_recommendation_count}건 중 상위 ${Math.min(
-                    recommendations.length,
-                    MAX_VISIBLE_RECOMMENDATIONS
-                  )}개를 카드 형태로 정리했습니다. 세부 점수와 보완 포인트를 한 화면에서 빠르게 비교할 수 있습니다.`
-                : "저장된 프로필을 기준으로 추천 공고의 적합도와 준비 상태를 분석해, 비교하기 쉬운 카드형 대시보드로 보여드립니다."}
-            </Text>
-          </View>
+    <Card className="flex-col gap-4 border-teal-100 bg-[#f5fffb] shadow-sm">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <Text className="text-xs font-black tracking-[0.14em] text-teal-700">진단 실행</Text>
+          <Text className="mt-2 text-xl font-black text-night">
+            {result ? result.overall_readiness_label : "프로필 기반으로 공고를 분석합니다"}
+          </Text>
+          <Text className="mt-2 text-sm leading-6 text-slate-600">
+            {result
+              ? `${result.returned_recommendation_count}개 추천 결과가 생성되었습니다.`
+              : "버튼을 누르면 저장된 프로필과 현재 공고 데이터를 비교합니다."}
+          </Text>
+        </View>
+        {isLoading && <ActivityIndicator color="#0f766e" />}
+      </View>
 
-          <View className="flex-row flex-wrap gap-2 lg:justify-end">
-            <LinkButton href="/mypage" variant="secondary" className="rounded-lg border-slate-200 px-4 py-2 text-xs">
-              프로필 확인
-            </LinkButton>
-            <Button  onPress={onRun} disabled={isLoading} className="rounded-lg px-4 py-2 text-xs">
-              {isLoading ? "진단 중..." : "적합도 진단 실행"}
-            </Button>
+      {errorMessage && (
+        <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-3">
+          <Text className="text-sm font-semibold text-red-700">{errorMessage}</Text>
+          {isMembershipLimitMessage(errorMessage) && (
+            <View className="mt-3">
+              <LinkButton href="/membership">Pro 멤버십 보기</LinkButton>
+            </View>
+          )}
+        </View>
+      )}
+
+      {profileMissing && (
+        <View className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+          <Text className="text-sm font-semibold text-amber-800">진단 전 프로필 등록이 필요합니다.</Text>
+          <View className="mt-3">
+            <LinkButton href="/onboarding/profile">프로필 등록하기</LinkButton>
           </View>
         </View>
-      </View>
+      )}
 
-      <View className="flex-row gap-2 border-t-4 border-emerald-50 bg-[linear-gradient(90deg,#eefcf8_0%,#ffffff_56%,#f8fbff_100%)] px-4 py-3 sm:flex-cols-2 xl:flex-cols-4">
-        <SummaryStatCard label="분석 공고 수" value={String(result?.total_candidate_count ?? 0)} helper="전체 후보 기준" />
-        <SummaryStatCard label="표시 공고 수" value={String(recommendations.length)} helper="상위 적합도 5건" />
-        <SummaryStatCard label="최고 적합도" value={`${topScore}%`} helper="가장 높은 점수" />
-        <SummaryStatCard label="평균 적합도" value={`${averageTotalScore}%`} helper="표시된 공고 평균" />
-      </View>
+      {result && (
+        <View className="flex-row gap-2">
+          <StatCard label="분석 공고" value={`${result.total_candidate_count}`} />
+          <StatCard label="최고 점수" value={`${clampScore(topScore)}%`} />
+          <StatCard label="평균 점수" value={`${clampScore(averageTotalScore)}%`} />
+        </View>
+      )}
+
+      <Button onPress={onRun} loading={isLoading} disabled={profileMissing || profileUnavailable}>
+        {isLoading ? "진단 중" : result ? "다시 진단하기" : "적합도 진단 실행"}
+      </Button>
     </Card>
   );
 }
@@ -368,302 +354,145 @@ function RecommendationCard({
   onCreatePlanner: () => void;
   isCreatingPlanner: boolean;
 }) {
-  const detailMetrics = detailMetricsForCard(recommendation);
   const totalScore = clampScore(recommendation.score_breakdown.total_score);
 
   return (
-    <Card
-      className={`overflow-hidden rounded-2xl border bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.05)] transition ${
-        selected
-          ? "border-teal-300 ring-1 ring-teal-200"
-          : "border-slate-200/80 hover:border-slate-300 hover:shadow-[0_20px_48px_rgba(15,23,42,0.07)]"
-      }`}
-    >
-      <View className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <Card className={`flex-col gap-4 shadow-sm ${selected ? "border-teal-400" : ""}`}>
+      <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <View className="flex-row flex-wrap items-center gap-2">
-            <Text className="flex-row items-center h-6 min-w-6 items-center justify-center rounded-full bg-slate-950 px-2 text-xs font-semibold text-white">
-              {rank}
-            </Text>
+            <View className="h-7 min-w-7 items-center justify-center rounded-full bg-night px-2">
+              <Text className="text-xs font-black text-white">{rank}</Text>
+            </View>
             <Badge tone={gradeTone(recommendation.recommendation_grade)}>등급 {recommendation.recommendation_grade}</Badge>
             <Badge tone={readinessTone(recommendation.readiness_status)}>{recommendation.readiness_label}</Badge>
           </View>
-
-          <View className="mt-4">
-            <Text className="text-lg font-semibold tracking-tight text-slate-950">{recommendation.job_title}</Text>
-            <View className="mt-1 flex-row flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-              <Text className="font-medium text-slate-700">{recommendation.company_name}</Text>
-              <Text>{countryLabel(recommendation.country)}</Text>
-            </View>
-          </View>
-
-          <View className="mt-4 flex-row gap-3 sm:flex-cols-3">
-            <MiniInfoCard label="추천 이유" value={recommendation.recommendation_summary} />
-            <MiniInfoCard
-              label="보완 항목"
-              value={recommendation.missing_items.length > 0 ? recommendation.missing_items.slice(0, 3).join(", ") : "즉시 지원 가능"}
-            />
-            <MiniInfoCard label="비교 기준" value={recommendation.pattern_title || recommendation.pattern_ref || "프로필 기준 분석"} />
-          </View>
+          <Text className="mt-3 text-lg font-black leading-6 text-night">{recommendation.job_title}</Text>
+          <Text className="mt-1 text-sm font-semibold text-slate-700">{recommendation.company_name}</Text>
+          <Text className="mt-1 text-xs text-slate-500">
+            {countryLabel(recommendation.country)} · {recommendation.work_type} · {recommendation.salary_range}
+          </Text>
         </View>
-
-        <View className="flex shrink-0 flex-row items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3 lg:w-[124px] lg:flex-col lg:items-center">
-          <ScoreRing score={totalScore} />
-          <View className="lg:text-center">
-            <Text className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">Overall Score</Text>
-            <Text className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{totalScore}%</Text>
-            <Text className="mt-1 text-xs font-medium text-teal-700">{recommendation.readiness_label}</Text>
-          </View>
+        <View className="h-20 w-20 items-center justify-center rounded-2xl bg-teal-50">
+          <Text className="text-2xl font-black text-teal-700">{totalScore}</Text>
+          <Text className="text-[10px] font-bold text-teal-700">점</Text>
         </View>
       </View>
 
-      <View className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-        <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-sm font-semibold text-slate-900">비교 지표</Text>
-          <Text className="text-xs font-medium text-slate-500">우선순위 기준 세부 점수</Text>
-        </View>
-        <View className="mt-3 flex-row gap-2 [flex-template-columns:repeat(auto-fit,minmax(132px,1fr))]">
-          {detailMetrics.map((metric) => (
-            <HorizontalMetricBar key={metric.label} label={metric.label} score={metric.score} />
-          ))}
+      <View className="flex-col gap-3">
+        <ScoreBar label="기술" value={clampScore(recommendation.score_breakdown.skill_score)} tone="brand" />
+        <ScoreBar label="경력" value={clampScore(recommendation.score_breakdown.experience_score)} tone="brand" />
+        <ScoreBar label="언어" value={clampScore(recommendation.score_breakdown.language_score)} tone="brand" />
+        <ScoreBar label="직무 적합도" value={clampScore(recommendation.job_fit_score)} tone="success" />
+      </View>
+
+      <View className="rounded-xl bg-slate-50 px-3 py-3">
+        <Text className="text-xs font-black text-slate-500">추천 이유</Text>
+        <Text className="mt-1 text-sm leading-6 text-slate-700">{recommendation.recommendation_summary}</Text>
+      </View>
+
+      <View className="flex-col gap-2">
+        <Text className="text-sm font-black text-night">보완 항목</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {recommendation.missing_items.length > 0 ? (
+            recommendation.missing_items.slice(0, 4).map((item) => <Badge key={item} tone="warning">{item}</Badge>)
+          ) : (
+            <Badge tone="success">즉시 지원 가능</Badge>
+          )}
         </View>
       </View>
 
-      <View className="mt-4 flex flex-col items-stretch justify-end gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
-        <Button  variant="secondary" onPress={onSelect} className="w-full rounded-lg border-slate-200 py-2 text-xs sm:w-[190px]">
-          {selected ? "선택됨" : "상세 비교"}
-        </Button>
-        <Button  onPress={onCreatePlanner} disabled={isCreatingPlanner} className="w-full rounded-lg py-2 text-xs sm:w-[230px]">
-          {isCreatingPlanner ? "생성 중..." : "커리어 플래너 생성"}
-        </Button>
+      <View className="flex-row gap-2">
+        <View className="flex-1">
+          <Button variant="outline" onPress={onSelect}>{selected ? "선택됨" : "상세 보기"}</Button>
+        </View>
+        <View className="flex-1">
+          <Button variant="secondary" onPress={onCreatePlanner} loading={isCreatingPlanner}>
+            플래너 생성
+          </Button>
+        </View>
       </View>
     </Card>
   );
 }
 
-function ComparisonPanel({
-  recommendation,
-  recommendations
-}: {
-  recommendation: JobRecommendation | null;
-  recommendations: JobRecommendation[];
-}) {
-  const distributionMax = Math.max(...recommendations.map((item) => item.score_breakdown.total_score), 1);
-  const averages = aggregateCategoryAverages(recommendations);
+function SelectedAnalysis({ recommendation }: { recommendation: JobRecommendation | null }) {
+  if (!recommendation) {
+    return null;
+  }
 
   return (
-    <View>
-      <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-        <View className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-4">
-          <Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Summary</Text>
-          <Text className="mt-2 text-xl font-semibold tracking-tight text-slate-950">전체 요약</Text>
-          <Text className="mt-2 text-sm leading-6 text-slate-500">상위 5개 공고 기준으로 적합도 분포와 평균 세부 점수를 정리했습니다.</Text>
-        </View>
-
-        <View className="space-y-4 p-4">
-          <View className="flex-row gap-2 gap-2">
-            <SummaryMiniStat label="최고 적합도" value={`${recommendations[0]?.score_breakdown.total_score ?? 0}%`} />
-            <SummaryMiniStat label="평균 적합도" value={`${averageScore(recommendations.map((item) => item.score_breakdown.total_score))}%`} />
-            <SummaryMiniStat label="평균 보완" value={`${averageScore(recommendations.map((item) => item.missing_items.length))}개`} />
-          </View>
-
-          <View>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-semibold text-slate-900">적합도 분포</Text>
-              <Text className="text-xs text-slate-500">Top 5</Text>
-            </View>
-            <View className="mt-4 flex-row items-end gap-3">
-              {recommendations.map((item, index) => {
-                const score = clampScore(item.score_breakdown.total_score);
-                const height = `${Math.max((score / distributionMax) * 100, 14)}%`;
-                return (
-                  <View key={`${item.job_id}-distribution`} className="flex flex-1 flex-col items-center gap-2">
-                    <Text className="text-xs font-semibold text-slate-500">{score}%</Text>
-                    <View className="flex h-24 w-full items-end rounded-full bg-slate-100 px-2 py-2">
-                      <View className="w-full rounded-full" style={{ height, backgroundColor: DISTRIBUTION_BAR_COLOR }} />
-                    </View>
-                    <Text className="text-xs font-medium text-slate-500">{index + 1}위</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          <View>
-            <Text className="text-sm font-semibold text-slate-900">항목별 평균 점수</Text>
-            <View className="mt-4 space-y-3">
-              {averages.map((item) => (
-                <BlueScoreBar key={item.label} label={item.label} value={item.value} />
-              ))}
-            </View>
-          </View>
-        </View>
-      </Card>
-
-      <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-        <View className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-4">
-          <Text className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Selected Analysis</Text>
-          <Text className="mt-2 text-xl font-semibold tracking-tight text-slate-950">선택 공고 분석</Text>
-          {recommendation ? (
-            <>
-              <Text className="mt-3 text-base font-semibold text-slate-900">{recommendation.job_title}</Text>
-              <Text className="mt-1 text-sm text-slate-500">{recommendation.company_name}</Text>
-            </>
-          ) : (
-            <Text className="mt-3 text-sm leading-6 text-slate-500">카드를 선택하면 세부 분석과 비교 기준을 오른쪽에서 바로 볼 수 있습니다.</Text>
-          )}
-        </View>
-
-        {recommendation ? (
-          <View className="space-y-3 p-4">
-            <PanelBlock title="평가 이유">{recommendation.evaluation_rationale || evaluationText(recommendation)}</PanelBlock>
-
-            <PanelBlock title="비교 기준">
-              <Text className="font-semibold text-teal-700">{recommendation.pattern_title || recommendation.pattern_ref}</Text>
-              <Text className="mt-2">{patternText(recommendation)}</Text>
-            </PanelBlock>
-
-            <PanelBlock title="추천 액션">{recommendation.next_action_summary}</PanelBlock>
-          </View>
-        ) : (
-          <View className="p-5">
-            <View className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center text-sm text-slate-500">
-              아직 선택된 공고가 없습니다.
-            </View>
-          </View>
-        )}
-      </Card>
-    </View>
-  );
-}
-
-function PanelBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View>
-      <Text className="text-sm font-semibold text-slate-900">{title}</Text>
-      <View className="mt-2 text-sm leading-6 text-slate-600">{children}</View>
-    </View>
-  );
-}
-
-function SummaryStatCard({ label, value, helper }: { label: string; value: string; helper: string }) {
-  return (
-    <View className="flex min-h-[74px] flex-col justify-center rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-      <Text className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</Text>
-      <Text className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{value}</Text>
-      <Text className="mt-1 text-[11px] leading-4 text-slate-500">{helper}</Text>
-    </View>
-  );
-}
-
-function SummaryMiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-      <Text className="text-[11px] font-semibold text-slate-500">{label}</Text>
-      <Text className="mt-2 text-lg font-semibold text-slate-950">{value}</Text>
-    </View>
-  );
-}
-
-function MiniInfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="min-h-[72px] rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-      <Text className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</Text>
-      <Text className="mt-1 line-clamp-3 text-xs leading-5 text-slate-700">{value}</Text>
-    </View>
-  );
-}
-
-function HorizontalMetricBar({ label, score }: { label: string; score: number }) {
-  const safeScore = clampScore(score);
-
-  return (
-    <View className="min-w-[132px] rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-      <View className="flex-row items-center justify-between gap-3">
-        <Text className="whitespace-nowrap text-[11px] font-medium text-slate-500">{label}</Text>
-        <Text className="shrink-0 text-xs font-semibold text-slate-900">{safeScore}%</Text>
+    <Card className="flex-col gap-4 shadow-sm">
+      <SectionTitle title="선택 공고 상세 분석" subtitle={`${recommendation.company_name} · ${recommendation.job_title}`} />
+      <PanelBlock title="평가 이유">{recommendation.evaluation_rationale || evaluationText(recommendation)}</PanelBlock>
+      <PanelBlock title="비교 기준">
+        {recommendation.pattern_title || recommendation.pattern_ref || "저장 프로필 기준 분석"}
+        {recommendation.pattern_evidence_summary ? `\n${recommendation.pattern_evidence_summary}` : ""}
+      </PanelBlock>
+      <PanelBlock title="추천 액션">{recommendation.next_action_summary}</PanelBlock>
+      <View className="flex-row flex-wrap gap-2">
+        <MetricBadge label="합격" value={recommendation.acceptance_probability_score} />
+        <MetricBadge label="연봉" value={recommendation.salary_score} />
+        <MetricBadge label="워라밸" value={recommendation.work_life_balance_score} />
+        <MetricBadge label="기업" value={recommendation.company_value_score} />
       </View>
-      <View className="mt-3 h-1.5 rounded-full bg-slate-100">
-        <View className="h-full rounded-full" style={{ width: `${safeScore}%`, backgroundColor: HORIZONTAL_BAR_COLOR }} />
-      </View>
-    </View>
-  );
-}
-
-function BlueScoreBar({ label, value }: { label: string; value: number }) {
-  const safeValue = clampScore(value);
-
-  return (
-    <View>
-      <View className="flex-row items-center justify-between gap-3 text-sm">
-        <Text className="font-medium text-slate-600">{label}</Text>
-        <Text className="font-semibold text-slate-900">{safeValue}</Text>
-      </View>
-      <View className="mt-2 h-2 rounded-full bg-slate-100">
-        <View className="h-full rounded-full" style={{ width: `${safeValue}%`, backgroundColor: HORIZONTAL_BAR_COLOR }} />
-      </View>
-    </View>
-  );
-}
-
-function ScoreRing({ score }: { score: number }) {
-  const safeScore = clampScore(score);
-
-  return (
-    <View
-      className="relative h-16 w-16 rounded-full"
-      style={{
-        background: `conic-gradient(${SCORE_RING_COLOR} ${safeScore * 3.6}deg, #dbeafe 0deg)`
-      }}
-    >
-      <View className="absolute inset-[7px] flex-row items-center justify-center rounded-full bg-white text-sm font-semibold text-slate-950">
-        {safeScore}
-      </View>
-    </View>
+    </Card>
   );
 }
 
 function LoadingState() {
   return (
-    <View className="flex-row gap-4">
-      {[0, 1, 2].map((item) => (
-        <Card key={item} className="h-[360px] animate-pulse rounded-[24px] border-slate-200 p-6">
-          <View className="h-8 w-20 rounded-full bg-slate-200" />
-          <View className="mt-5 h-8 w-64 rounded bg-slate-200" />
-          <View className="mt-3 h-5 w-40 rounded bg-slate-200" />
-          <View className="mt-6 flex flex-cols-1 gap-3 sm:flex-cols-3">
-            <View className="h-20 rounded-2xl bg-slate-200" />
-            <View className="h-20 rounded-2xl bg-slate-200" />
-            <View className="h-20 rounded-2xl bg-slate-200" />
-          </View>
-          <View className="mt-6 flex-row gap-2 gap-3 lg:flex-cols-5">
-            {[0, 1, 2, 3, 4].map((cell) => (
-              <View key={cell} className="h-20 rounded-2xl bg-slate-200" />
-            ))}
-          </View>
-        </Card>
-      ))}
+    <Card className="items-center justify-center gap-3 py-10">
+      <ActivityIndicator color="#0f766e" />
+      <Text className="text-sm font-semibold text-slate-700">적합도 진단을 분석하고 있습니다.</Text>
+      <Text className="text-center text-xs leading-5 text-slate-500">프로필과 공고 조건을 비교해 추천 결과를 만드는 중입니다.</Text>
+    </Card>
+  );
+}
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <View>
+      <Text className="text-lg font-black text-night">{title}</Text>
+      {subtitle && <Text className="mt-1 text-sm leading-5 text-slate-500">{subtitle}</Text>}
     </View>
   );
 }
 
-function NoCandidateState() {
+function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <EmptyState
-      title="조건에 맞는 공고가 없습니다."
-      description="희망 국가, 직무 분야, 언어 수준, 경력 조건을 다시 확인해보세요. 현재 프로필과 연결되는 공고가 있으면 상위 추천 결과가 표시됩니다."
-    />
+    <View className="min-w-[46%] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+      <Text className="text-[11px] font-bold text-slate-500">{label}</Text>
+      <Text className="mt-1 text-sm font-black text-night">{value}</Text>
+    </View>
   );
 }
 
-function detailMetricsForCard(recommendation: JobRecommendation) {
-  return [
-    { label: "합격 가능성", score: recommendation.acceptance_probability_score ?? 0 },
-    { label: "연봉", score: recommendation.salary_score ?? 0 },
-    { label: "워라밸", score: recommendation.work_life_balance_score ?? 0 },
-    { label: "기업 가치", score: recommendation.company_value_score ?? 0 },
-    { label: "직무 적합도", score: recommendation.job_fit_score ?? 0 }
-  ];
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-1 rounded-xl border border-teal-100 bg-white px-3 py-3">
+      <Text className="text-[11px] font-bold text-slate-500">{label}</Text>
+      <Text className="mt-1 text-lg font-black text-night">{value}</Text>
+    </View>
+  );
+}
+
+function PanelBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View className="rounded-xl bg-slate-50 px-3 py-3">
+      <Text className="text-xs font-black text-slate-500">{title}</Text>
+      <Text className="mt-1 text-sm leading-6 text-slate-700">{children}</Text>
+    </View>
+  );
+}
+
+function MetricBadge({ label, value }: { label: string; value: number }) {
+  return (
+    <View className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <Text className="text-[11px] font-bold text-slate-500">{label}</Text>
+      <Text className="mt-1 text-base font-black text-night">{clampScore(value)}%</Text>
+    </View>
+  );
 }
 
 function priorityLabels(profile: UserProfileRequest) {
@@ -676,41 +505,17 @@ function priorityLabels(profile: UserProfileRequest) {
   return labels;
 }
 
-function aggregateCategoryAverages(recommendations: JobRecommendation[]) {
-  if (recommendations.length === 0) {
-    return [
-      { label: "스킬", value: 0 },
-      { label: "경력", value: 0 },
-      { label: "언어", value: 0 },
-      { label: "포트폴리오", value: 0 }
-    ];
-  }
-
-  return [
-    { label: "스킬", value: averageScore(recommendations.map((item) => item.score_breakdown.skill_score)) },
-    { label: "경력", value: averageScore(recommendations.map((item) => item.score_breakdown.experience_score)) },
-    { label: "언어", value: averageScore(recommendations.map((item) => item.score_breakdown.language_score)) },
-    { label: "포트폴리오", value: averageScore(recommendations.map((item) => item.score_breakdown.portfolio_score)) }
-  ];
-}
-
 function averageScore(values: number[]) {
   if (values.length === 0) return 0;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
 function clampScore(score: number) {
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return Math.max(0, Math.min(100, Math.round(score ?? 0)));
 }
 
 function evaluationText(recommendation: JobRecommendation) {
-  const core = `${recommendation.company_name}의 ${recommendation.job_title} 공고와 저장된 프로필을 비교한 결과입니다.`;
-  return `${core} 기술 역량, 경력 조건, 언어 조건, 포트폴리오 준비도를 중심으로 점수를 계산했고, 우선순위 기준도 함께 반영했습니다.`;
-}
-
-function patternText(recommendation: JobRecommendation) {
-  if (recommendation.pattern_evidence_summary) return recommendation.pattern_evidence_summary;
-  return "공고 요구사항과 직무 패턴을 기준으로 강점과 보완 포인트를 정리한 결과입니다.";
+  return `${recommendation.company_name}의 ${recommendation.job_title} 공고와 저장된 프로필을 비교한 결과입니다. 기술 역량, 경력 조건, 언어 조건, 포트폴리오 준비도를 중심으로 계산했습니다.`;
 }
 
 function gradeTone(grade: string) {

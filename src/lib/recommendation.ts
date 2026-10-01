@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, getStoredUser, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, getStoredUser, readApiError } from "@/lib/auth";
 
 export type ReadinessStatus = "IMMEDIATE_APPLY" | "PREPARE_THEN_APPLY" | "LONG_TERM_PREPARE";
 
@@ -145,7 +145,7 @@ export const demoProfile: UserProfileRequest = {
 };
 
 export async function diagnoseRecommendations(profile: UserProfileRequest): Promise<RecommendationResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  const baseUrl = getApiBaseUrl();
   const storedUser = getStoredUser();
   const requestProfile = profile.user_id || !storedUser
     ? profile
@@ -173,7 +173,7 @@ export async function diagnoseRecommendations(profile: UserProfileRequest): Prom
 }
 
 export async function diagnoseStoredProfile(userId: number): Promise<RecommendationResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/recommendations/diagnose/users/${userId}`, {
     method: "POST",
     headers: authHeaders(),
@@ -188,7 +188,7 @@ export async function diagnoseStoredProfile(userId: number): Promise<Recommendat
 }
 
 export async function diagnoseStoredProfileForJob(userId: number, jobId: number): Promise<RecommendationResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/recommendations/diagnose/users/${userId}/jobs/${jobId}`, {
     method: "POST",
     headers: authHeaders(),
@@ -203,7 +203,7 @@ export async function diagnoseStoredProfileForJob(userId: number, jobId: number)
 }
 
 export async function fetchUserProfile(userId: number): Promise<UserProfileSummary> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/users/${userId}/profile`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -217,7 +217,7 @@ export async function fetchUserProfile(userId: number): Promise<UserProfileSumma
 }
 
 export async function saveUserProfile(userId: number, profile: UserProfileRequest): Promise<UserProfileSummary> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/users/${userId}/profile`, {
     method: "PUT",
     headers: {
