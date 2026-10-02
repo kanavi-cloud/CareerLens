@@ -8,7 +8,7 @@ import {
 } from "@/components/jobs/JobFilterBar";
 import { SiteHeader } from "@/components/site-header";
 import { Button, Card, EmptyState, LinkButton, PageShell } from "@/components/ui";
-import { getStoredUser } from "@/lib/auth";
+import { loadStoredUserAsync } from "@/lib/auth";
 import { fetchJobs, type JobPosting } from "@/lib/jobs";
 import { isMembershipLimitMessage } from "@/lib/membership";
 import { createPlannerRoadmap } from "@/lib/planner";
@@ -141,7 +141,7 @@ export default function JobsPage() {
   }
 
   async function handleCreateRoadmap(job: JobPosting) {
-    const user = getStoredUser();
+    const user = await loadStoredUserAsync();
     if (!user) {
       router.push("/login");
       return;

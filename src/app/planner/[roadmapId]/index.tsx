@@ -130,8 +130,8 @@ export default function PlannerRoadmapPage() {
     setCreatingApplication(true);
     setErrorMessage(null);
     try {
-      await createApplicationFromRoadmap(roadmap.roadmap_id);
-      router.push("/applications");
+      const application = await createApplicationFromRoadmap(roadmap.roadmap_id);
+      router.push(`/applications/${application.application_id}`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error

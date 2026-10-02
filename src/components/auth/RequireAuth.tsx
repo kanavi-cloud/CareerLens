@@ -1,18 +1,41 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
 import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { EmptyState, LinkButton, PageHeader, PageShell } from "@/components/ui";
-import { getStoredUser, type AuthUser } from "@/lib/auth";
+import { getStoredUser, loadStoredUserAsync, type AuthUser } from "@/lib/auth";
+import { View } from "react-native";
 
 export function useRequiredAuth() {
   const [isChecking, setIsChecking] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    setUser(getStoredUser());
-    setIsChecking(false);
+    let isMounted = true;
+    const cachedUser = getStoredUser();
+    if (cachedUser) {
+      setUser(cachedUser);
+      setIsChecking(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    loadStoredUserAsync()
+      .then((storedUser) => {
+        if (isMounted) {
+          setUser(storedUser);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsChecking(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return {

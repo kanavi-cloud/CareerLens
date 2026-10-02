@@ -1,7 +1,7 @@
 import { View, Text, Pressable } from 'react-native';
 "use client";
 
-import Link from "expo-router";
+import { Link } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, TextInput } from "@/components/ui";
 import { authHeaders, getStoredUser, isAdminUser } from "@/lib/auth";

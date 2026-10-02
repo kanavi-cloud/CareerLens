@@ -348,9 +348,7 @@ public class DeparturePlanService {
     private DeparturePlanRequestDto requestFromRoadmap(PlannerRoadmap roadmap, JobPosting job) {
         String country = firstNonBlank(job == null ? null : job.getCountry(), "United States");
         String city = destinationCityFor(country, job == null ? null : job.getWorkType());
-        LocalDate startDate = job != null && job.getApplicationDeadline() != null
-                ? job.getApplicationDeadline().plusWeeks(8)
-                : LocalDate.now().plusWeeks(Math.max(4, roadmap.getDurationWeeks() == null ? 8 : roadmap.getDurationWeeks()));
+        LocalDate startDate = startDateForRoadmap(roadmap, job);
 
         return new DeparturePlanRequestDto(
                 country,
@@ -362,6 +360,18 @@ public class DeparturePlanService {
                 firstNonBlank(job == null ? null : job.getVisaRequirement(), "비자 조건 확인 필요"),
                 "임시 숙소 미정"
         );
+    }
+
+    private LocalDate startDateForRoadmap(PlannerRoadmap roadmap, JobPosting job) {
+        int preparationWeeks = Math.max(4, roadmap.getDurationWeeks() == null ? 8 : roadmap.getDurationWeeks());
+        LocalDate fallbackStartDate = LocalDate.now().plusWeeks(preparationWeeks);
+        LocalDate deadlineBasedStartDate = job != null && job.getApplicationDeadline() != null
+                ? job.getApplicationDeadline().plusWeeks(8)
+                : null;
+        if (deadlineBasedStartDate == null || deadlineBasedStartDate.isBefore(LocalDate.now())) {
+            return fallbackStartDate;
+        }
+        return deadlineBasedStartDate;
     }
 
     private String destinationCityFor(String country, String workType) {

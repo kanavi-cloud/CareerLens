@@ -1,4 +1,3 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
 import { useState } from "react";
@@ -6,6 +5,7 @@ import { Badge, Button, Card, ScoreBar } from "@/components/ui";
 import { languageLevelLabel, workTypeLabel } from "@/lib/display-labels";
 import type { JobPosting } from "@/lib/jobs";
 import { countryLabel, daysText, deadlineText, deadlineTone, formatDate } from "./job-format";
+import { Linking, Pressable, Text, View } from "react-native";
 
 type DetailTab = "overview" | "company";
 
@@ -121,14 +121,15 @@ export function JobDetailPanel({
 
       <View className="flex shrink-0 gap-2 border-t border-slate-100 bg-white p-4 sm:flex-cols-[1fr_1.2fr]">
         {sourceUrl ? (
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex-row items-center min-h-11 items-center justify-center rounded-lg border border-line bg-white px-4 py-2 text-sm font-bold text-night transition hover:border-night"
+          <Button
+            variant="outline"
+            className="min-h-11"
+            onPress={() => {
+              void Linking.openURL(sourceUrl);
+            }}
           >
             원문 보기
-          </a>
+          </Button>
         ) : (
           <Button  variant="secondary" disabled>
             원문 없음
@@ -142,16 +143,18 @@ export function JobDetailPanel({
   );
 }
 
-function TabButton({ active, children, onClick }: { active: boolean; children: string; onClick: () => void }) {
+function TabButton({ active, children, onPress }: { active: boolean; children: string; onPress: () => void }) {
   return (
     <Pressable
       
       className={`rounded-full px-4 py-2 text-sm font-black transition ${
         active ? "bg-white text-night shadow-sm" : "text-slate-500 hover:text-night"
       }`}
-      onPress={onClick}
+      onPress={onPress}
     >
-      {children}
+      <Text className={`text-sm font-black ${active ? "text-night" : "text-slate-500"}`}>
+        {children}
+      </Text>
     </Pressable>
   );
 }

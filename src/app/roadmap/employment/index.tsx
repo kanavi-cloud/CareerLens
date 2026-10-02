@@ -1,7 +1,7 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
-import Link from "expo-router";
+import { Link } from "expo-router";
+import { Pressable, Text, View } from "react-native";
 import { AuthCheckingScreen, AuthRequiredScreen, useRequiredAuth } from "@/components/auth/RequireAuth";
 import { SiteHeader } from "@/components/site-header";
 import { Badge, Card, LinkButton, PageHeader, PageShell } from "@/components/ui";
@@ -52,19 +52,21 @@ export default function EmploymentRoadmapPage() {
 
         <View className="mt-6 flex-row gap-5 lg:flex-cols-3">
           {modules.map((module) => (
-            <Link key={module.title} href={module.href}>
-              <Card className="flex min-h-[270px] flex-col rounded-2xl border-slate-200 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_22px_60px_rgba(15,23,42,0.10)]">
-                <Text className="text-xl font-bold text-night">{module.title}</Text>
+            <Link key={module.title} href={module.href as any} asChild>
+              <Pressable>
+                <Card className="flex min-h-[270px] flex-col rounded-2xl border-slate-200 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-[0_22px_60px_rgba(15,23,42,0.10)]">
+                  <Text className="text-xl font-bold text-night">{module.title}</Text>
 
-                <View className="mt-8 flex-1 border-t border-slate-100 pt-4">
-                  <View className="mt-3 flex-row flex-wrap gap-2">
-                    {module.bullets.map((bullet) => (
-                      <Badge key={bullet} tone="muted">{bullet}</Badge>
-                    ))}
+                  <View className="mt-8 flex-1 border-t border-slate-100 pt-4">
+                    <View className="mt-3 flex-row flex-wrap gap-2">
+                      {module.bullets.map((bullet) => (
+                        <Badge key={bullet} tone="muted">{bullet}</Badge>
+                      ))}
+                    </View>
+                    <Text className="mt-4 text-sm font-bold text-brand">바로가기</Text>
                   </View>
-                  <Text className="mt-4 text-sm font-bold text-brand">바로가기</Text>
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             </Link>
           ))}
         </View>

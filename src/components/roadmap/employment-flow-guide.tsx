@@ -1,7 +1,7 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
-import Link from "expo-router";
+import { Link } from "expo-router";
+import { Pressable, Text, View } from "react-native";
 
 export type EmploymentFlowStep = "diagnosis" | "planner" | "documents" | "applications" | "departure";
 
@@ -53,7 +53,7 @@ export function EmploymentFlowGuide({ currentStep, roadmapId, className = "" }: 
   const currentIndex = steps.findIndex((step) => step.key === currentStep);
 
   return (
-    <View>
+    <View className={className}>
       <View className="flex-row items-center justify-between gap-3">
         <View>
           <Text className="text-[11px] font-black uppercase tracking-[0.16em] text-brand">Career Flow</Text>
@@ -64,16 +64,17 @@ export function EmploymentFlowGuide({ currentStep, roadmapId, className = "" }: 
         </Text>
       </View>
 
-      <ol className="mt-4 space-y-2">
+      <View className="mt-4 gap-2">
         {steps.map((step, index) => {
           const isCurrent = step.key === currentStep;
           const isDone = index < currentIndex;
           const href = getStepHref(step.key, roadmapId);
 
           return (
-            <li key={step.key}>
-              <Link
-                href={href}
+            <Link key={step.key} href={href as any} asChild>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityState={{ selected: isCurrent }}
                 className={`group flex flex-cols-[28px_minmax(0,1fr)] gap-2.5 rounded-2xl border p-2.5 transition ${
                   isCurrent
                     ? "border-night bg-night text-white shadow-sm"
@@ -81,33 +82,34 @@ export function EmploymentFlowGuide({ currentStep, roadmapId, className = "" }: 
                       ? "border-emerald-100 bg-emerald-50 text-night hover:border-emerald-200"
                       : "border-slate-200 bg-[#fbfcfd] text-night hover:border-brand/40"
                 }`}
-                aria-current={isCurrent ? "step" : undefined}
               >
-                <Text
-                  className={`flex h-7 w-7 place-items-center rounded-full text-xs font-black ${
+                <View
+                  className={`h-7 w-7 items-center justify-center rounded-full ${
                     isCurrent
-                      ? "bg-white text-night"
+                      ? "bg-white"
                       : isDone
-                        ? "bg-emerald-600 text-white"
+                        ? "bg-emerald-600"
                         : "bg-white text-slate-500 ring-1 ring-slate-200"
                   }`}
                 >
-                  {isDone ? "✓" : index + 1}
-                </Text>
-                <Text className="min-w-0">
-                  <Text className="flex-row items-center justify-between gap-2">
-                    <Text className="truncate text-sm font-black">{step.label}</Text>
-                    {isCurrent && <Text className="shrink-0 text-[10px] font-black text-white/70">현재</Text>}
+                  <Text className={`text-xs font-black ${isCurrent ? "text-night" : isDone ? "text-white" : "text-slate-500"}`}>
+                    {isDone ? "✓" : index + 1}
                   </Text>
+                </View>
+                <View className="min-w-0 flex-1">
+                  <View className="flex-row items-center justify-between gap-2">
+                    <Text className={`truncate text-sm font-black ${isCurrent ? "text-white" : "text-night"}`}>{step.label}</Text>
+                    {isCurrent && <Text className="shrink-0 text-[10px] font-black text-white/70">현재</Text>}
+                  </View>
                   <Text className={`mt-1  text-xs leading-4 ${isCurrent ? "text-white/75" : "text-slate-500"}`}>
                     {step.description}
                   </Text>
-                </Text>
-              </Link>
-            </li>
+                </View>
+              </Pressable>
+            </Link>
           );
         })}
-      </ol>
+      </View>
 
       <View className="mt-4 rounded-2xl border border-slate-200 bg-[#f8faf9] p-3">
         <Text className="text-xs font-black text-slate-500">다음 행동</Text>
@@ -121,32 +123,36 @@ export function EmploymentFlowStrip({ currentStep, roadmapId, className = "" }: 
   const currentIndex = steps.findIndex((step) => step.key === currentStep);
 
   return (
-    <View>
-      <ol className="flex min-w-max gap-2">
+    <View className={className}>
+      <View className="flex-row gap-2">
         {steps.map((step, index) => {
           const isCurrent = step.key === currentStep;
           const isDone = index < currentIndex;
 
           return (
-            <li key={step.key}>
-              <Link
-                href={getStepHref(step.key, roadmapId)}
-                className={`flex min-h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-black transition ${
+            <Link key={step.key} href={getStepHref(step.key, roadmapId) as any} asChild>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityState={{ selected: isCurrent }}
+                className={`min-h-11 flex-row items-center gap-2 rounded-2xl border px-4 transition ${
                   isCurrent
                     ? "border-night bg-night text-white"
                     : isDone
                       ? "border-emerald-100 bg-emerald-50 text-emerald-800"
                       : "border-slate-200 bg-[#fbfcfd] text-slate-600 hover:border-brand/40"
                 }`}
-                aria-current={isCurrent ? "step" : undefined}
               >
-                <Text>{isDone ? "✓" : index + 1}</Text>
-                <Text>{step.shortLabel}</Text>
-              </Link>
-            </li>
+                <Text className={`text-sm font-black ${isCurrent ? "text-white" : isDone ? "text-emerald-800" : "text-slate-600"}`}>
+                  {isDone ? "✓" : index + 1}
+                </Text>
+                <Text className={`text-sm font-black ${isCurrent ? "text-white" : isDone ? "text-emerald-800" : "text-slate-600"}`}>
+                  {step.shortLabel}
+                </Text>
+              </Pressable>
+            </Link>
           );
         })}
-      </ol>
+      </View>
     </View>
   );
 }

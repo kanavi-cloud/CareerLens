@@ -1,10 +1,11 @@
-import { View, Text, Pressable } from 'react-native';
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { AuthCheckingScreen, AuthRequiredScreen, useRequiredAuth } from "@/components/auth/RequireAuth";
 import { SiteHeader } from "@/components/site-header";
-import { Badge, Button, Card, EmptyState, LinkButton, PageHeader, PageShell, SelectInput, TextInput } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, LinkButton, PageHeader, PageShell, TextInput, type Tone } from "@/components/ui";
 import {
   fetchDeparturePlanFromRoadmap,
   generateDeparturePlan,
@@ -14,12 +15,17 @@ import {
   type DeparturePlanRequest
 } from "@/lib/departure";
 
+const countryOptions = [
+  { country: "일본", city: "도쿄", airport: "HND" },
+  { country: "미국", city: "샌프란시스코", airport: "SFO" }
+];
+
 const defaultRequest: DeparturePlanRequest = {
   target_country: "일본",
   destination_city: "도쿄",
   origin_airport: "ICN",
   destination_airport: "HND",
-  start_date: "2026-06-20",
+  start_date: defaultStartDate(),
   arrival_buffer_days: 14,
   visa_status: "내정 후 회사 제출 서류 확인 필요",
   housing_status: "임시 숙소 미정"
@@ -27,8 +33,17 @@ const defaultRequest: DeparturePlanRequest = {
 
 type DepartureMilestone = DeparturePlan["milestones"][number];
 
+function defaultStartDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 90);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function DepartureRoadmapPage() {
+  const params = useLocalSearchParams<{ roadmapId?: string | string[] }>();
   const auth = useRequiredAuth();
+  const roadmapIdValue = Array.isArray(params.roadmapId) ? params.roadmapId[0] : params.roadmapId;
+  const parsedRoadmapId = Number(roadmapIdValue ?? 0);
   const [form, setForm] = useState<DeparturePlanRequest>(defaultRequest);
   const [plan, setPlan] = useState<DeparturePlan | null>(null);
   const [linkedRoadmapId, setLinkedRoadmapId] = useState<number | null>(null);
@@ -38,16 +53,20 @@ export default function DepartureRoadmapPage() {
 
   useEffect(() => {
     if (auth.isChecking || !auth.user) return;
-    const roadmapId = Number(new URLSearchParams(window.location.search).get("roadmapId") ?? 0);
-    if (!roadmapId) return;
-    setLinkedRoadmapId(roadmapId);
+    if (!parsedRoadmapId) return;
+
+    setLinkedRoadmapId(parsedRoadmapId);
     setIsLoading(true);
     setErrorMessage(null);
-    loadRoadmapPlan(roadmapId)
+    loadRoadmapPlan(parsedRoadmapId)
       .then(setPlan)
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : "출국 로드맵을 생성하지 못했습니다."))
       .finally(() => setIsLoading(false));
-  }, [auth.isChecking, auth.user]);
+  }, [auth.isChecking, auth.user, parsedRoadmapId]);
+
+  const destinationLabel = useMemo(() => {
+    return `${form.target_country} · ${form.destination_city} · ${form.destination_airport}`;
+  }, [form.destination_airport, form.destination_city, form.target_country]);
 
   if (auth.isChecking) {
     return <AuthCheckingScreen title="출국로드맵 접근 권한을 확인하는 중입니다." />;
@@ -94,58 +113,84 @@ export default function DepartureRoadmapPage() {
     }
   }
 
+  function selectCountry(country: (typeof countryOptions)[number]) {
+    setForm((current) => ({
+      ...current,
+      target_country: country.country,
+      destination_city: country.city,
+      destination_airport: country.airport
+    }));
+  }
+
+  function update<Key extends keyof DeparturePlanRequest>(key: Key, value: DeparturePlanRequest[Key]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
   return (
     <PageShell>
       <SiteHeader />
       <PageHeader
         kicker="DEPARTURE ROADMAP"
         title="출국로드맵"
+        description="입사 예정일을 기준으로 출국 후보 기간, 입국 여유일, 항공 확인 기준, 준비 마일스톤을 정리합니다."
         actions={
           <>
             <LinkButton
               href={linkedRoadmapId ? `/roadmap/administration?roadmapId=${linkedRoadmapId}` : "/roadmap/administration"}
-              className="min-w-[132px] whitespace-nowrap"
+              variant="secondary"
             >
-              행정로드맵 확인
+              행정로드맵
             </LinkButton>
             {linkedRoadmapId && (
-              <Button  variant="secondary" onPress={refreshLinkedPlan} disabled={isRefreshing || isLoading}>
-                {isRefreshing ? "갱신 중" : "최신 정보로 갱신"}
+              <Button variant="outline" onPress={refreshLinkedPlan} disabled={isRefreshing || isLoading} loading={isRefreshing}>
+                최신 정보로 갱신
               </Button>
             )}
           </>
         }
       />
 
-      <View>
-        <View>
+      <View className="lens-container gap-5 pb-10 xl:flex-row">
+        <View className="gap-5 xl:w-[360px]">
           <Card className="p-5">
             <Text className="lens-kicker">TRAVEL INPUT</Text>
             <Text className="mt-3 text-2xl font-semibold text-night">출국 조건 입력</Text>
-            <View className="mt-5 space-y-4">
-              <SelectInput label="목표 국가" value={form.target_country} onChange={(event) => update("target_country", event.target.value)}>
-                <option value="일본">일본</option>
-                <option value="미국">미국</option>
-              </SelectInput>
-              <TextInput label="도착 도시" value={form.destination_city} onChange={(event) => update("destination_city", event.target.value)} />
-              <View className="flex-row gap-3 sm:flex-cols-2 lg:flex-cols-1 xl:flex-cols-2">
-                <TextInput label="출발 공항" helper="IATA" value={form.origin_airport} onChange={(event) => update("origin_airport", event.target.value.toUpperCase())} />
-                <TextInput label="도착 공항" helper="IATA" value={form.destination_airport} onChange={(event) => update("destination_airport", event.target.value.toUpperCase())} />
+            <Text className="mt-2 text-sm leading-6 text-slate-600">{destinationLabel}</Text>
+
+            <View className="mt-5 gap-4">
+              <View>
+                <Text className="mb-2 text-sm font-semibold text-slate-700">목표 국가</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {countryOptions.map((option) => {
+                    const active = form.target_country === option.country;
+                    return (
+                      <Pressable
+                        key={option.country}
+                        onPress={() => selectCountry(option)}
+                        className={`rounded-lg border px-3 py-2 ${active ? "border-night bg-night" : "border-line bg-white"}`}
+                      >
+                        <Text className={`text-sm font-semibold ${active ? "text-white" : "text-night"}`}>{option.country}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-              <TextInput label="입사 예정일" type="date" value={form.start_date} onChange={(event) => update("start_date", event.target.value)} />
+              <TextInput label="도착 도시" value={form.destination_city} onChangeText={(value) => update("destination_city", value)} />
+              <View className="gap-3 sm:flex-row">
+                <TextInput label="출발 공항" value={form.origin_airport} onChangeText={(value) => update("origin_airport", value.toUpperCase())} autoCapitalize="characters" />
+                <TextInput label="도착 공항" value={form.destination_airport} onChangeText={(value) => update("destination_airport", value.toUpperCase())} autoCapitalize="characters" />
+              </View>
+              <TextInput label="입사 예정일" value={form.start_date} onChangeText={(value) => update("start_date", value)} placeholder="YYYY-MM-DD" />
               <TextInput
                 label="입국 여유일"
-                helper="입사 며칠 전 도착할지"
-                type="number"
-                min={3}
-                max={45}
-                value={form.arrival_buffer_days}
-                onChange={(event) => update("arrival_buffer_days", Number(event.target.value))}
+                value={String(form.arrival_buffer_days)}
+                onChangeText={(value) => update("arrival_buffer_days", Number(value) || 0)}
+                keyboardType="number-pad"
               />
-              <TextInput label="비자 상태" value={form.visa_status} onChange={(event) => update("visa_status", event.target.value)} />
-              <TextInput label="숙소 상태" value={form.housing_status} onChange={(event) => update("housing_status", event.target.value)} />
-              <Button  disabled={isLoading} onPress={submitPlan} className="w-full">
-                {isLoading ? "로드맵 생성 중" : "출국 로드맵 생성"}
+              <TextInput label="비자 상태" value={form.visa_status} onChangeText={(value) => update("visa_status", value)} />
+              <TextInput label="숙소 상태" value={form.housing_status} onChangeText={(value) => update("housing_status", value)} />
+              <Button disabled={isLoading} loading={isLoading} onPress={submitPlan}>
+                출국 로드맵 생성
               </Button>
             </View>
           </Card>
@@ -164,10 +209,10 @@ export default function DepartureRoadmapPage() {
           </Card>
         </View>
 
-        <View>
+        <View className="flex-1 gap-5">
           {errorMessage && <EmptyState title="출국 로드맵 생성 실패" description={errorMessage} />}
 
-          {!plan && !errorMessage && (
+          {!plan && !errorMessage && !isLoading && (
             <EmptyState
               title="입사 예정일 기준 출국 일정을 생성할 수 있습니다."
               description="도착 도시, 공항 코드, 입사 예정일, 비자/숙소 상태를 입력하면 출국 후보 기간과 준비 마일스톤을 계산합니다."
@@ -177,12 +222,10 @@ export default function DepartureRoadmapPage() {
           {plan && (
             <>
               <DepartureJourneyPanel plan={plan} linkedRoadmapId={linkedRoadmapId} />
-
-              <View className="flex-row gap-5 xl:flex-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+              <View className="gap-5 xl:flex-row">
                 <FlightOfferDeck plan={plan} />
                 <MilestoneJourney milestones={plan.milestones} />
               </View>
-
               <Card className="p-5">
                 <Text className="text-xs leading-5 text-slate-500">{plan.disclaimer}</Text>
               </Card>
@@ -192,10 +235,6 @@ export default function DepartureRoadmapPage() {
       </View>
     </PageShell>
   );
-
-  function update<Key extends keyof DeparturePlanRequest>(key: Key, value: DeparturePlanRequest[Key]) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
 }
 
 function DepartureJourneyPanel({ plan, linkedRoadmapId }: { plan: DeparturePlan; linkedRoadmapId: number | null }) {
@@ -205,16 +244,16 @@ function DepartureJourneyPanel({ plan, linkedRoadmapId }: { plan: DeparturePlan;
     : null;
 
   return (
-    <View>
-      <View className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <View>
+    <Card className="p-5">
+      <View className="gap-3 md:flex-row md:items-start md:justify-between">
+        <View className="flex-1">
           <View className="flex-row flex-wrap gap-2">
             <Badge tone={isAiAssisted ? "brand" : "muted"}>{isAiAssisted ? "AI 보조" : "규칙 기반"}</Badge>
             <Badge tone={urgencyTone(plan.urgency_status)}>{urgencyLabel(plan.urgency_status)}</Badge>
             <Badge tone={flightDataTone(plan.flight_data_status)}>{flightDataLabel(plan.flight_data_status)}</Badge>
           </View>
           <Text className="mt-4 text-2xl font-semibold leading-8 text-night">
-            <Text aria-hidden="true">✈️</Text> {plan.origin_airport} → {plan.destination_airport} 출국 계획
+            {plan.origin_airport} → {plan.destination_airport} 출국 계획
           </Text>
           <Text className="mt-2 text-sm leading-6 text-slate-600">{plan.summary}</Text>
           {updatedLabel && <Text className="mt-2 text-xs font-semibold text-slate-500">{updatedLabel}</Text>}
@@ -222,26 +261,25 @@ function DepartureJourneyPanel({ plan, linkedRoadmapId }: { plan: DeparturePlan;
         <LinkButton
           href={linkedRoadmapId ? `/roadmap/administration?roadmapId=${linkedRoadmapId}` : "/roadmap/administration"}
           variant="secondary"
-          className="shrink-0 whitespace-nowrap"
         >
           행정로드맵 확인
         </LinkButton>
       </View>
 
-      <View className="mt-5 flex-row gap-3 sm:flex-cols-2 xl:flex-cols-4">
+      <View className="mt-5 flex-row flex-wrap gap-3">
         <SummaryFact label="출국 후보" value={formatDateRange(plan.departure_window_start, plan.departure_window_end)} />
         <SummaryFact label="권장 입국" value={plan.recommended_arrival_date} />
         <SummaryFact label="입사 예정" value={plan.start_date} />
         <SummaryFact label="준비 D-day" value={dDayLabel(plan.days_until_departure_window)} helper={`${bufferDaysLabel(plan.recommended_arrival_date, plan.start_date)} 여유`} />
       </View>
-    </View>
+    </Card>
   );
 }
 
 function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
   return (
-    <View>
-      <View className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="flex-1 p-5">
+      <View className="gap-3 sm:flex-row sm:items-start sm:justify-between">
         <View>
           <Text className="lens-kicker">FLIGHT</Text>
           <Text className="mt-3 text-xl font-semibold text-night">항공편 확인</Text>
@@ -255,15 +293,13 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
       <Text className="mt-4 text-sm leading-6 text-slate-700">{plan.flight_search_note}</Text>
 
       {plan.flight_offers.length > 0 ? (
-        <View className="mt-5 space-y-3">
+        <View className="mt-5 gap-3">
           {plan.flight_offers.map((offer, index) => (
             <View key={`${offer.provider}-${offer.departure_at}-${index}`} className="rounded-xl border border-line bg-panel p-4">
-              <View className="flex-row gap-4 md:flex-cols-[minmax(0,1fr)_auto] md:items-center">
-                <View className="min-w-0">
+              <View className="gap-4 md:flex-row md:items-center md:justify-between">
+                <View className="flex-1">
                   <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="text-base font-semibold text-night">
-                      {offer.origin_code} → {offer.destination_code}
-                    </Text>
+                    <Text className="text-base font-semibold text-night">{offer.origin_code} → {offer.destination_code}</Text>
                     <Badge tone="muted">{offer.provider}</Badge>
                   </View>
                   <Text className="mt-2 text-xs leading-5 text-slate-500">
@@ -273,11 +309,9 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
                     {offer.carrier_name || offer.carrier_code} {offer.flight_number} · {offer.duration || "소요시간 미기재"}
                   </Text>
                 </View>
-                <View className="rounded-2xl bg-white px-4 py-3 text-left shadow-sm md:text-right">
-                  <Text className="text-xs font-bold text-slate-500">예상 비용</Text>
-                  <Text className="mt-1 text-lg font-semibold text-night">
-                    {offer.currency} {offer.total_price || "미기재"}
-                  </Text>
+                <View className="rounded-xl bg-white px-4 py-3">
+                  <Text className="text-xs font-semibold text-slate-500">예상 비용</Text>
+                  <Text className="mt-1 text-lg font-semibold text-night">{offer.currency} {offer.total_price || "미기재"}</Text>
                   {offer.bookable_seats !== null && <Text className="mt-1 text-xs text-slate-500">좌석 {offer.bookable_seats}</Text>}
                 </View>
               </View>
@@ -295,14 +329,14 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
           </View>
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
 function MilestoneJourney({ milestones }: { milestones: DepartureMilestone[] }) {
   return (
-    <View>
-      <View className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="flex-1 p-5">
+      <View className="gap-3 sm:flex-row sm:items-start sm:justify-between">
         <View>
           <Text className="lens-kicker">MILESTONES</Text>
           <Text className="mt-3 text-xl font-semibold text-night">준비 단계</Text>
@@ -310,34 +344,32 @@ function MilestoneJourney({ milestones }: { milestones: DepartureMilestone[] }) 
         <Badge tone="muted">{milestones.length}개 단계</Badge>
       </View>
 
-      <View className="mt-5 divide-y divide-line">
+      <View className="mt-5 gap-3">
         {milestones.map((milestone, index) => (
-          <View>
-            <View className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${milestoneMarkerClass(milestone.status)}`}>
-              {index + 1}
+          <View key={`${milestone.phase}-${milestone.title}`} className="flex-row gap-3 rounded-xl border border-line bg-panel p-4">
+            <View className={`h-8 w-8 items-center justify-center rounded-full ${milestoneMarkerClass(milestone.status)}`}>
+              <Text className={`text-xs font-semibold ${milestone.status === "DONE" ? "text-slate-700" : "text-white"}`}>{index + 1}</Text>
             </View>
-            <View className="min-w-0">
+            <View className="flex-1">
               <View className="flex-row flex-wrap items-center gap-2">
-                <Text className="text-xs font-bold uppercase text-brand">{milestone.phase}</Text>
+                <Text className="text-xs font-semibold uppercase text-brand">{milestone.phase}</Text>
                 <Text className="text-xs font-semibold text-slate-500">기한 {milestone.due_date}</Text>
               </View>
               <Text className="mt-1 text-base font-semibold leading-6 text-night">{milestone.title}</Text>
-              <Text className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{milestone.description}</Text>
+              <Text className="mt-1 text-sm leading-6 text-slate-600">{milestone.description}</Text>
             </View>
-            <Badge tone={milestoneTone(milestone.status)} className="w-fit shrink-0">
-              {milestoneLabel(milestone.status)}
-            </Badge>
+            <Badge tone={milestoneTone(milestone.status)}>{milestoneLabel(milestone.status)}</Badge>
           </View>
         ))}
       </View>
-    </View>
+    </Card>
   );
 }
 
 function SummaryFact({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <View className="rounded-xl border border-line bg-panel px-4 py-3">
-      <Text className="text-xs font-bold text-slate-500">{label}</Text>
+      <Text className="text-xs font-semibold text-slate-500">{label}</Text>
       <Text className="mt-1 text-base font-semibold text-night">{value}</Text>
       {helper && <Text className="mt-1 text-xs leading-5 text-slate-500">{helper}</Text>}
     </View>
@@ -382,7 +414,7 @@ function urgencyLabel(status: string) {
   return "지연";
 }
 
-function urgencyTone(status: string) {
+function urgencyTone(status: string): Tone {
   if (status === "ON_TRACK") return "success";
   if (status === "SOON") return "warning";
   return "risk";
@@ -394,16 +426,16 @@ function milestoneLabel(status: string) {
   return "예정";
 }
 
-function milestoneTone(status: string) {
+function milestoneTone(status: string): Tone {
   if (status === "DONE") return "muted";
   if (status === "URGENT") return "risk";
   return "brand";
 }
 
 function milestoneMarkerClass(status: string) {
-  if (status === "DONE") return "bg-slate-200 text-slate-700";
-  if (status === "URGENT") return "bg-red-600 text-white";
-  return "bg-brand text-white";
+  if (status === "DONE") return "bg-slate-200";
+  if (status === "URGENT") return "bg-coral";
+  return "bg-brand";
 }
 
 function flightDataLabel(status: string) {
@@ -413,7 +445,7 @@ function flightDataLabel(status: string) {
   return "API 미설정";
 }
 
-function flightDataTone(status: string) {
+function flightDataTone(status: string): Tone {
   if (status === "LIVE_DUFFEL" || status === "LIVE_AMADEUS") return "success";
   if (status === "NO_RESULTS_OR_FAILED") return "warning";
   return "muted";
@@ -424,7 +456,7 @@ function isMissingSavedPlan(error: unknown) {
   return message.includes("not found") || message.includes("404");
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value?: string | null) {
   if (!value) return "미기재";
   return value.replace("T", " ");
 }
