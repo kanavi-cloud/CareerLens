@@ -238,7 +238,7 @@ export default function DepartureRoadmapPage() {
 }
 
 function DepartureJourneyPanel({ plan, linkedRoadmapId }: { plan: DeparturePlan; linkedRoadmapId: number | null }) {
-  const isAiAssisted = plan.generation_mode.includes("AI");
+  const isAiAssisted = (plan.generation_mode ?? "").includes("AI");
   const updatedLabel = plan.updated_at
     ? `저장일 ${formatDateTime(plan.created_at ?? plan.updated_at)} · 최근 갱신 ${formatDateTime(plan.refreshed_at ?? plan.updated_at)}`
     : null;
@@ -277,6 +277,9 @@ function DepartureJourneyPanel({ plan, linkedRoadmapId }: { plan: DeparturePlan;
 }
 
 function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
+  const flightOffers = Array.isArray(plan.flight_offers) ? plan.flight_offers : [];
+  const flightApiProviders = Array.isArray(plan.flight_api_providers) ? plan.flight_api_providers : [];
+
   return (
     <Card className="flex-1 p-5">
       <View className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -286,15 +289,15 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
         </View>
         <View className="flex-row flex-wrap gap-2">
           <Badge tone={flightDataTone(plan.flight_data_status)}>{flightDataLabel(plan.flight_data_status)}</Badge>
-          {plan.flight_offers.length > 0 && <Badge tone="brand">{plan.flight_offers.length}개 후보</Badge>}
+          {flightOffers.length > 0 && <Badge tone="brand">{flightOffers.length}개 후보</Badge>}
         </View>
       </View>
 
       <Text className="mt-4 text-sm leading-6 text-slate-700">{plan.flight_search_note}</Text>
 
-      {plan.flight_offers.length > 0 ? (
+      {flightOffers.length > 0 ? (
         <View className="mt-5 gap-3">
-          {plan.flight_offers.map((offer, index) => (
+          {flightOffers.map((offer, index) => (
             <View key={`${offer.provider}-${offer.departure_at}-${index}`} className="rounded-xl border border-line bg-panel p-4">
               <View className="gap-4 md:flex-row md:items-center md:justify-between">
                 <View className="flex-1">
@@ -323,7 +326,7 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
           <Text className="text-sm font-semibold text-night">실시간 후보 없음</Text>
           <Text className="mt-1 text-xs leading-5 text-slate-500">아래 API 연동 또는 공식 항공사/OTA에서 최종 확인합니다.</Text>
           <View className="mt-3 flex-row flex-wrap gap-2">
-            {plan.flight_api_providers.slice(0, 3).map((provider) => (
+            {flightApiProviders.slice(0, 3).map((provider) => (
               <Badge key={provider.provider} tone="muted">{provider.provider}</Badge>
             ))}
           </View>
@@ -334,6 +337,8 @@ function FlightOfferDeck({ plan }: { plan: DeparturePlan }) {
 }
 
 function MilestoneJourney({ milestones }: { milestones: DepartureMilestone[] }) {
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+
   return (
     <Card className="flex-1 p-5">
       <View className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -341,11 +346,11 @@ function MilestoneJourney({ milestones }: { milestones: DepartureMilestone[] }) 
           <Text className="lens-kicker">MILESTONES</Text>
           <Text className="mt-3 text-xl font-semibold text-night">준비 단계</Text>
         </View>
-        <Badge tone="muted">{milestones.length}개 단계</Badge>
+        <Badge tone="muted">{safeMilestones.length}개 단계</Badge>
       </View>
 
       <View className="mt-5 gap-3">
-        {milestones.map((milestone, index) => (
+        {safeMilestones.map((milestone, index) => (
           <View key={`${milestone.phase}-${milestone.title}`} className="flex-row gap-3 rounded-xl border border-line bg-panel p-4">
             <View className={`h-8 w-8 items-center justify-center rounded-full ${milestoneMarkerClass(milestone.status)}`}>
               <Text className={`text-xs font-semibold ${milestone.status === "DONE" ? "text-slate-700" : "text-white"}`}>{index + 1}</Text>

@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type MembershipSummary = {
   user_id: number;
@@ -22,9 +22,8 @@ export type KakaoPayReadyResponse = {
   expires_at: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function fetchMembershipSummary(): Promise<MembershipSummary> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/memberships/me`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -38,6 +37,7 @@ export async function fetchMembershipSummary(): Promise<MembershipSummary> {
 }
 
 export async function startKakaoPayProPass(): Promise<KakaoPayReadyResponse> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/payments/kakao/ready`, {
     method: "POST",
     headers: authHeaders(),

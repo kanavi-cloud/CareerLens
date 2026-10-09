@@ -1,5 +1,5 @@
 import type { JobPosting } from "@/lib/jobs";
-import { authHeaders } from "@/lib/auth";
+import { authHeaders, getApiBaseUrl } from "@/lib/auth";
 
 export type ExternalJobPreview = {
   provider: string;
@@ -57,9 +57,8 @@ export type ExternalJobSyncStatus = {
   last_message: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function previewGreenhouseJobs(params: ExternalJobImportRequest): Promise<ExternalJobPreview[]> {
+  const baseUrl = getApiBaseUrl();
   const query = new URLSearchParams();
   query.set("boardToken", params.board_token);
   if (params.default_country) query.set("defaultCountry", params.default_country);
@@ -79,6 +78,7 @@ export async function previewGreenhouseJobs(params: ExternalJobImportRequest): P
 }
 
 export async function importGreenhouseJobs(request: ExternalJobImportRequest): Promise<ExternalJobImportResponse> {
+  const baseUrl = getApiBaseUrl();
   const response = await fetch(`${baseUrl}/api/jobs/external/greenhouse/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...adminHeaders() },
@@ -93,6 +93,7 @@ export async function importGreenhouseJobs(request: ExternalJobImportRequest): P
 }
 
 export async function fetchGreenhouseSyncStatus(): Promise<ExternalJobSyncStatus> {
+  const baseUrl = getApiBaseUrl();
   const response = await fetch(`${baseUrl}/api/jobs/external/greenhouse/sync/status`, {
     headers: adminHeaders(),
     cache: "no-store"
@@ -106,6 +107,7 @@ export async function fetchGreenhouseSyncStatus(): Promise<ExternalJobSyncStatus
 }
 
 export async function runGreenhouseSync(): Promise<ExternalJobSyncStatus> {
+  const baseUrl = getApiBaseUrl();
   const response = await fetch(`${baseUrl}/api/jobs/external/greenhouse/sync/run`, {
     method: "POST",
     headers: adminHeaders()
