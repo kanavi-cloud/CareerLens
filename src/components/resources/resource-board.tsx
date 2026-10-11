@@ -4,7 +4,7 @@ import { View, Text, Pressable } from 'react-native';
 import { Link } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, TextInput } from "@/components/ui";
-import { authHeaders, getStoredUser, isAdminUser } from "@/lib/auth";
+import { authHeaders, getApiBaseUrl, getStoredUser, isAdminUser } from "@/lib/auth";
 
 export type ResourceBoardPost = {
   id: string;
@@ -110,7 +110,7 @@ export function ResourceBoard({
     if (!apiType) {
       return;
     }
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+    const baseUrl = getApiBaseUrl();
     try {
       const response = await fetch(`${baseUrl}/api/resources/posts?type=${apiType}`, { cache: "no-store" });
       if (!response.ok) {
@@ -159,7 +159,7 @@ export function ResourceBoard({
     }
     setLoading(true);
     setMessage(null);
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+    const baseUrl = getApiBaseUrl();
     const editingNumericId = editingPostId && /^\d+$/.test(editingPostId) ? editingPostId : null;
     const endpoint = editingNumericId
       ? `${baseUrl}/api/resources/posts/${editingNumericId}`
@@ -208,7 +208,7 @@ export function ResourceBoard({
     }
     setLoading(true);
     setMessage(null);
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+    const baseUrl = getApiBaseUrl();
     try {
       const response = await fetch(`${baseUrl}/api/resources/posts/${post.id}`, {
         method: "DELETE",
@@ -233,7 +233,7 @@ export function ResourceBoard({
     }
     setLoading(true);
     setMessage(null);
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+    const baseUrl = getApiBaseUrl();
     try {
       const response = await fetch(`${baseUrl}/api/resources/posts/qna/questions`, {
         method: "POST",

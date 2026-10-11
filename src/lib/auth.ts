@@ -28,6 +28,7 @@ export type AvailabilityResponse = {
 };
 
 const STORAGE_KEY = "careerlens_user";
+const DEFAULT_API_BASE_URL = "http://35.77.2.135:8080";
 
 // Native 앱 내 즉시 접근을 위한 메모리 캐시 변수
 let memoryUserCache: AuthUser | null = null;
@@ -104,11 +105,11 @@ export function getApiBaseUrl(): string {
       "EXPO_PUBLIC_API_BASE_URL"
     ] as string | undefined;
 
-  const candidates = [envFromProcess, envFromExpoExtra].filter(
+  const candidates = [envFromExpoExtra, envFromProcess].filter(
     (v): v is string => typeof v === "string" && v.trim().length > 0
   );
 
-  return candidates[0] ?? "http://localhost:8080";
+  return candidates[0] ?? DEFAULT_API_BASE_URL;
 }
 
 function getBaseUrl(): string {
@@ -139,7 +140,7 @@ export async function apiFetch(
     } else if (lowerMsg.includes("load failed") || lowerMsg.includes("not found") || lowerMsg.includes("enotfound")) {
       extraHint =
         "\n\n💡 예상 원인: 호스트를 찾을 수 없습니다\n" +
-        "  EXPO_PUBLIC_API_BASE_URL 이 올바른 호스트인지 확인해주세요. (Docker: localhost:8088 / 직접실행: localhost:8080)";
+        "  EXPO_PUBLIC_API_BASE_URL 이 올바른 호스트인지 확인해주세요. (공용 서버: http://35.77.2.135:8080)";
     } else if (lowerMsg.includes("timeout") || lowerMsg.includes("timed out")) {
       extraHint = "\n\n💡 예상 원인: 서버 응답 시간 초과 - 백엔드가 아직 초기화 중일 수 있으니 잠시 후 다시 시도하세요.";
     }
