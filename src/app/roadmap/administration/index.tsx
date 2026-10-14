@@ -96,7 +96,7 @@ export default function AdministrationRoadmapPage() {
       roadmapId ? loadRoadmapGuidance(roadmapId) : generateSettlementGuidance(auth.user.user_id)
     ])
       .then(([loadedItems, generatedGuidance]) => {
-        setItems(loadedItems);
+        setItems(Array.isArray(loadedItems) ? loadedItems : []);
         setGuidance(generatedGuidance);
       })
       .catch((error) => setErrorMessage(error instanceof Error ? error.message : "행정로드맵 데이터를 불러오지 못했습니다."))
@@ -143,11 +143,13 @@ export default function AdministrationRoadmapPage() {
   const completionRate = adminItems.length === 0 ? 0 : Math.round((doneCount / adminItems.length) * 100);
   const guidanceRate = guidance?.completion_rate ?? completionRate;
   const remainingCount = Math.max(0, adminItems.length - doneCount);
-  const priorityActions = guidance?.priority_actions?.length
-    ? guidance.priority_actions
+  const guidancePriorityActions = Array.isArray(guidance?.priority_actions) ? guidance.priority_actions : [];
+  const guidanceCountrySummaries = Array.isArray(guidance?.country_summaries) ? guidance.country_summaries : [];
+  const priorityActions = guidancePriorityActions.length
+    ? guidancePriorityActions
     : adminItems.slice(0, 4).map((item) => `${item.country} - ${item.checklist_title}`);
-  const countrySummaries = guidance?.country_summaries?.length
-    ? guidance.country_summaries
+  const countrySummaries = guidanceCountrySummaries.length
+    ? guidanceCountrySummaries
     : fallbackCountrySummaries(adminItems);
 
   if (auth.isChecking) {
@@ -248,7 +250,7 @@ export default function AdministrationRoadmapPage() {
 }
 
 function PriorityPanel({ actions }: { actions: string[] }) {
-  const visibleActions = actions.slice(0, 5);
+  const visibleActions = Array.isArray(actions) ? actions.slice(0, 5) : [];
   return (
     <Card className="flex-1 p-5">
       <View className="flex-row flex-wrap items-center justify-between gap-3">
@@ -273,6 +275,8 @@ function PriorityPanel({ actions }: { actions: string[] }) {
 }
 
 function CountryReadinessPanel({ summaries }: { summaries: CountrySummary[] }) {
+  const safeSummaries = Array.isArray(summaries) ? summaries : [];
+
   return (
     <Card className="flex-1 p-5">
       <View className="flex-row flex-wrap items-center justify-between gap-3">
@@ -280,10 +284,10 @@ function CountryReadinessPanel({ summaries }: { summaries: CountrySummary[] }) {
           <Text className="lens-kicker">COUNTRY READINESS</Text>
           <Text className="mt-3 text-xl font-semibold text-night">국가별 행정 리스크</Text>
         </View>
-        <Badge tone="muted">{summaries.length}개 국가</Badge>
+        <Badge tone="muted">{safeSummaries.length}개 국가</Badge>
       </View>
       <View className="mt-5 gap-3">
-        {summaries.map((summary) => (
+        {safeSummaries.map((summary) => (
           <View key={summary.country} className="rounded-xl border border-line bg-panel p-4">
             <View className="flex-row items-start justify-between gap-3">
               <View>
@@ -296,7 +300,7 @@ function CountryReadinessPanel({ summaries }: { summaries: CountrySummary[] }) {
               <ScoreBar label="국가별 완료율" value={summary.completion_rate} tone={summary.completion_rate >= 70 ? "success" : "warning"} />
             </View>
             <View className="mt-4 gap-2">
-              {summary.next_actions.slice(0, 3).map((action) => (
+              {(Array.isArray(summary.next_actions) ? summary.next_actions : []).slice(0, 3).map((action) => (
                 <Text key={action} className="text-sm leading-6 text-slate-600">- {action}</Text>
               ))}
             </View>

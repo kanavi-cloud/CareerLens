@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type ApplicationStatus = "INTERESTED" | "PREPARING_DOCUMENTS" | "APPLIED" | "INTERVIEW" | "CLOSED";
 
@@ -41,9 +41,8 @@ export type ApplicationRecord = {
   last_activity_at: string | null;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function fetchUserApplications(userId: number): Promise<ApplicationRecord[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/users/${userId}`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -57,6 +56,7 @@ export async function fetchUserApplications(userId: number): Promise<Application
 }
 
 export async function createApplicationFromRoadmap(roadmapId: number): Promise<ApplicationRecord> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/from-roadmap/${roadmapId}`, {
     method: "POST",
     headers: authHeaders(),
@@ -71,6 +71,7 @@ export async function createApplicationFromRoadmap(roadmapId: number): Promise<A
 }
 
 export async function createApplicationFromJob(userId: number, jobId: number): Promise<ApplicationRecord> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/users/${userId}/jobs/${jobId}`, {
     method: "POST",
     headers: authHeaders(),
@@ -85,6 +86,7 @@ export async function createApplicationFromJob(userId: number, jobId: number): P
 }
 
 export async function fetchApplication(applicationId: number): Promise<ApplicationRecord> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/${applicationId}`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -98,6 +100,7 @@ export async function fetchApplication(applicationId: number): Promise<Applicati
 }
 
 export async function updateApplicationStatus(applicationId: number, status: ApplicationStatus): Promise<ApplicationRecord> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/${applicationId}/status`, {
     method: "PATCH",
     headers: {
@@ -119,6 +122,7 @@ export async function updateApplicationWorkspace(
   applicationId: number,
   input: { candidate_notes?: string; next_action?: string }
 ): Promise<ApplicationRecord> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/applications/${applicationId}/workspace`, {
     method: "PATCH",
     headers: {

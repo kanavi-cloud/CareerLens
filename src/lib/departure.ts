@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type DeparturePlanRequest = {
   target_country: string;
@@ -60,9 +60,8 @@ export type DeparturePlan = {
   refreshed_at?: string | null;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function generateDeparturePlan(request: DeparturePlanRequest): Promise<DeparturePlan> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/departure/plan`, {
     method: "POST",
     headers: {
@@ -81,6 +80,7 @@ export async function generateDeparturePlan(request: DeparturePlanRequest): Prom
 }
 
 export async function generateDeparturePlanFromRoadmap(roadmapId: number): Promise<DeparturePlan> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/departure/roadmaps/${roadmapId}/plan`, {
     method: "POST",
     headers: authHeaders(),
@@ -95,6 +95,7 @@ export async function generateDeparturePlanFromRoadmap(roadmapId: number): Promi
 }
 
 export async function fetchDeparturePlanFromRoadmap(roadmapId: number): Promise<DeparturePlan> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/departure/roadmaps/${roadmapId}/plan`, {
     method: "GET",
     headers: authHeaders(),
@@ -109,6 +110,7 @@ export async function fetchDeparturePlanFromRoadmap(roadmapId: number): Promise<
 }
 
 export async function refreshDeparturePlanFromRoadmap(roadmapId: number): Promise<DeparturePlan> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/departure/roadmaps/${roadmapId}/plan/refresh`, {
     method: "POST",
     headers: authHeaders(),

@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type SettlementStatus = "NOT_STARTED" | "IN_PROGRESS" | "DONE";
 
@@ -34,9 +34,8 @@ export type SettlementGuidance = {
   refreshed_at?: string | null;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function fetchSettlementChecklists(userId: number): Promise<SettlementChecklistItem[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/users/${userId}/checklists`, {
     headers: authHeaders(),
     cache: "no-store"
@@ -50,6 +49,7 @@ export async function fetchSettlementChecklists(userId: number): Promise<Settlem
 }
 
 export async function updateSettlementChecklistStatus(itemId: number, status: SettlementStatus): Promise<SettlementChecklistItem> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/checklists/${itemId}/status`, {
     method: "PATCH",
     headers: {
@@ -68,6 +68,7 @@ export async function updateSettlementChecklistStatus(itemId: number, status: Se
 }
 
 export async function generateSettlementGuidance(userId: number): Promise<SettlementGuidance> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/users/${userId}/guidance`, {
     method: "POST",
     headers: authHeaders(),
@@ -82,6 +83,7 @@ export async function generateSettlementGuidance(userId: number): Promise<Settle
 }
 
 export async function generateSettlementGuidanceFromRoadmap(roadmapId: number): Promise<SettlementGuidance> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/roadmaps/${roadmapId}/guidance`, {
     method: "POST",
     headers: authHeaders(),
@@ -96,6 +98,7 @@ export async function generateSettlementGuidanceFromRoadmap(roadmapId: number): 
 }
 
 export async function fetchSettlementGuidanceFromRoadmap(roadmapId: number): Promise<SettlementGuidance> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/roadmaps/${roadmapId}/guidance`, {
     method: "GET",
     headers: authHeaders(),
@@ -110,6 +113,7 @@ export async function fetchSettlementGuidanceFromRoadmap(roadmapId: number): Pro
 }
 
 export async function refreshSettlementGuidanceFromRoadmap(roadmapId: number): Promise<SettlementGuidance> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(`${baseUrl}/api/settlement/roadmaps/${roadmapId}/guidance/refresh`, {
     method: "POST",
     headers: authHeaders(),

@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, readApiError } from "@/lib/auth";
+import { apiFetch, authHeaders, getApiBaseUrl, readApiError } from "@/lib/auth";
 
 export type VerificationBadge = {
   badge_id: number;
@@ -27,13 +27,12 @@ export type VerificationResult = {
   issued_badges: VerificationBadge[];
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-
 export async function verifyTaskText(input: {
   taskId: number;
   documentType: string;
   submittedText: string;
 }): Promise<VerificationResult> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(
     `${baseUrl}/api/verifications/tasks/${input.taskId}/text`,
     {
@@ -59,6 +58,7 @@ export async function verifyTaskText(input: {
 }
 
 export async function fetchTaskVerifications(taskId: number): Promise<VerificationResult[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(
     `${baseUrl}/api/verifications/tasks/${taskId}`,
     {
@@ -80,6 +80,7 @@ export async function verifyTaskGithub(input: {
   githubUrl: string;
   note?: string;
 }): Promise<VerificationResult> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(
     `${baseUrl}/api/verifications/tasks/${input.taskId}/github`,
     {
@@ -109,6 +110,7 @@ export async function verifyTaskFile(input: {
   documentType: string;
   file: File;
 }): Promise<VerificationResult> {
+  const baseUrl = getApiBaseUrl();
   const body = new FormData();
   body.append("document_type", input.documentType);
   body.append("file", input.file);
@@ -132,6 +134,7 @@ export async function verifyTaskFile(input: {
 }
 
 export async function fetchUserBadges(userId: number): Promise<VerificationBadge[]> {
+  const baseUrl = getApiBaseUrl();
   const response = await apiFetch(
     `${baseUrl}/api/verifications/users/${userId}/badges`,
     {
